@@ -26,6 +26,7 @@ const transactionSchema = new mongoose.Schema({
   wallet: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Wallet',
+    required: true,
   },
   note: {
     type: String,

@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { X, Coffee, Car, ShoppingBag, Receipt, Gamepad2, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Coffee, Car, ShoppingBag, Receipt, Gamepad2, MoreHorizontal, ArrowUpCircle } from 'lucide-react';
+import { createTransaction } from '../services/transactionService';
+import { getWallets } from '../services/walletService';
 
-const AddTransactionModal = ({ isOpen, onClose }) => {
+const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   const [type, setType] = useState('expense'); // 'expense' or 'income'
   const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('food');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [walletId, setWalletId] = useState('');
+  const [note, setNote] = useState('');
   
-  if (!isOpen) return null;
+  const [wallets, setWallets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const categories = [
+  const expenseCategories = [
     { id: 'food', name: 'Ăn uống', icon: Coffee, color: 'text-orange-500', bg: 'bg-orange-100' },
     { id: 'transport', name: 'Di chuyển', icon: Car, color: 'text-blue-500', bg: 'bg-blue-100' },
     { id: 'shopping', name: 'Mua sắm', icon: ShoppingBag, color: 'text-purple-500', bg: 'bg-purple-100' },
@@ -16,9 +24,74 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
     { id: 'other', name: 'Khác', icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
   ];
 
+  const incomeCategories = [
+    { id: 'salary', name: 'Lương', icon: ArrowUpCircle, color: 'text-green-500', bg: 'bg-green-100' },
+    { id: 'other', name: 'Khác', icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
+  ];
+
+  const currentCategories = type === 'expense' ? expenseCategories : incomeCategories;
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset form
+      setType('expense');
+      setAmount('');
+      setCategory('food');
+      setDate(new Date().toISOString().split('T')[0]);
+      setNote('');
+      setError('');
+      
+      // Fetch wallets
+      const fetchWallets = async () => {
+        try {
+          const data = await getWallets();
+          setWallets(data);
+          if (data.length > 0) {
+            setWalletId(data[0]._id);
+          }
+        } catch (err) {
+          console.error('Lỗi khi tải ví', err);
+        }
+      };
+      fetchWallets();
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!amount || !walletId) {
+      setError('Vui lòng nhập số tiền và chọn ví');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError('');
+      await createTransaction({
+        amount: Number(amount),
+        type,
+        category,
+        date,
+        note,
+        walletId
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Có lỗi xảy ra khi thêm giao dịch');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
+          <X className="w-5 h-5" />
+        </button>
+        
         {/* Header Tabs */}
         <div className="flex border-b">
           <button
@@ -27,7 +100,7 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50/50' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
-            onClick={() => setType('expense')}
+            onClick={() => { setType('expense'); setCategory('food'); }}
           >
             Chi tiêu
           </button>
@@ -37,7 +110,7 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
                 ? 'text-green-600 border-b-2 border-green-600 bg-green-50/50' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
-            onClick={() => setType('income')}
+            onClick={() => { setType('income'); setCategory('salary'); }}
           >
             Thu nhập
           </button>
@@ -45,12 +118,14 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
 
         {/* Form Content */}
         <div className="p-6 space-y-5">
+          {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
+          
           {/* Amount */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền</label>
             <div className="relative">
               <input
-                type="text"
+                type="number"
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -64,12 +139,13 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Danh mục</label>
             <div className="grid grid-cols-4 gap-4">
-              {categories.map((cat) => (
+              {currentCategories.map((cat) => (
                 <button
                   key={cat.id}
-                  className="flex flex-col items-center gap-1 group"
+                  onClick={() => setCategory(cat.id)}
+                  className={`flex flex-col items-center gap-1 group transition-all ${category === cat.id ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-100'}`}
                 >
-                  <div className={`w-12 h-12 rounded-full ${cat.bg} flex items-center justify-center border-2 border-transparent hover:border-gray-300 transition-all`}>
+                  <div className={`w-12 h-12 rounded-full ${cat.bg} flex items-center justify-center border-2 ${category === cat.id ? 'border-gray-400' : 'border-transparent group-hover:border-gray-300'}`}>
                     <cat.icon className={`w-6 h-6 ${cat.color}`} />
                   </div>
                   <span className="text-xs text-gray-600 font-medium">{cat.name}</span>
@@ -82,14 +158,23 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ngày</label>
-              <input type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" defaultValue="2025-07-01" />
+              <input 
+                type="date" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" 
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ví</label>
-              <select className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none">
-                <option>Ví chính</option>
-                <option>Tiền mặt</option>
-                <option>Thẻ tín dụng</option>
+              <select 
+                value={walletId}
+                onChange={(e) => setWalletId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+              >
+                {wallets.length === 0 ? <option value="">Đang tải ví...</option> : 
+                  wallets.map(w => <option key={w._id} value={w._id}>{w.name}</option>)
+                }
               </select>
             </div>
           </div>
@@ -97,7 +182,13 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
           {/* Note */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nội dung / Ghi chú</label>
-            <input type="text" placeholder="Ăn trưa cùng bạn..." className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" />
+            <input 
+              type="text" 
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ăn trưa cùng bạn..." 
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" 
+            />
           </div>
         </div>
 
@@ -105,14 +196,17 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
         <div className="flex gap-3 px-6 py-4 bg-gray-50 border-t">
           <button 
             onClick={onClose}
+            disabled={loading}
             className="flex-1 px-4 py-2 bg-white border rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Hủy
           </button>
           <button 
-            className="flex-1 px-4 py-2 bg-green-600 rounded-lg font-medium text-white hover:bg-green-700 transition-colors shadow-sm"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 px-4 py-2 bg-green-600 rounded-lg font-medium text-white hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
           >
-            Lưu giao dịch
+            {loading ? 'Đang lưu...' : 'Lưu giao dịch'}
           </button>
         </div>
       </div>

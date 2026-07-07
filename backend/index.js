@@ -2,9 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const startReminderCronJob = require('./jobs/reminderJob');
 
 // Connect to database
 connectDB();
+
+// Start Background Jobs
+startReminderCronJob();
 
 const app = express();
 
@@ -21,8 +25,8 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/transactions', require('./routes/transactionRoutes'));
 
-// Placeholders for future
-// app.use('/api/wallets', require('./routes/walletRoutes'));
+app.use('/api/wallets', require('./routes/walletRoutes'));
+app.use('/api/reminders', require('./routes/reminderRoutes'));
 // app.use('/api/budgets', require('./routes/budgetRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
