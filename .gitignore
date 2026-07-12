@@ -126,3 +126,7 @@ dist
 
 # Windows files
 Thumbs.db
+
+# Custom files
+PhanCongNhiemVu.md
+.gemini/

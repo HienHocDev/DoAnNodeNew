@@ -11,31 +11,37 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Reminders from './pages/Reminders';
 import Analysis from './pages/Analysis';
+import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import './App.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Auth />} />
-        
-        {/* Main Routes wrapped in Layout */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/budgets" element={<Budgets />} />
-          <Route path="/goals" element={<Goals />} />
-          <Route path="/wallets" element={<Wallets />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/reminders" element={<Reminders />} />
-          <Route path="/analysis" element={<Analysis />} />
-        </Route>
+    <ThemeProvider>
+      <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Auth />} />
+          
+          {/* Main Routes wrapped in Layout */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/budgets" element={<Budgets />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/wallets" element={<Wallets />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/reminders" element={<Reminders />} />
+            <Route path="/analysis" element={<Analysis />} />
+          </Route>
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+    </ThemeProvider>
   );
 }
 
