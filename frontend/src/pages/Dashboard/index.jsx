@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
 import { getDashboardAnalytics } from '../../services/analyticsService';
+import { useTheme } from '../../context/ThemeContext';
 
 const Dashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { t } = useTheme();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -14,7 +16,7 @@ const Dashboard = () => {
         const res = await getDashboardAnalytics();
         setAnalyticsData(res);
       } catch (err) {
-        setError('Không thể kết nối API Tổng quan.');
+        setError(t('dashboard_error_api'));
       } finally {
         setLoading(false);
       }
@@ -22,7 +24,7 @@ const Dashboard = () => {
     fetchAnalytics();
   }, []);
 
-  if (loading) return <div className="text-center py-10 text-gray-500">Đang tải dữ liệu tổng quan...</div>;
+  if (loading) return <div className="text-center py-10 text-gray-500">{t('dashboard_loading')}</div>;
   if (error) return <div className="text-red-500 text-center py-10">{error}</div>;
 
   // Mảng màu sắc dự phòng để tự động gán nếu không tìm thấy key trùng khớp
@@ -75,60 +77,70 @@ const Dashboard = () => {
   const { summary } = analyticsData;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Cards Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Tổng thu nhập</p>
-            <h3 className="text-2xl font-bold text-gray-900">{summary.totalIncome.toLocaleString('vi-VN')}đ</h3>
-            <p className="text-sm text-green-600 flex items-center gap-1 mt-1">
-              <ArrowUpCircle className="w-4 h-4" /> +12.5%
-            </p>
+        {/* Total Income Card */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary-500/10 dark:bg-primary-500/5 rounded-full blur-2xl"></div>
+          <div className="relative z-10">
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_income')}</p>
+            <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalIncome.toLocaleString('vi-VN')}đ</h3>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold rounded-lg mt-3 border border-green-100 dark:border-green-500/20">
+              <ArrowUpCircle className="w-4 h-4" /> 
+              <span>+12.5%</span>
+            </div>
           </div>
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-            <Wallet className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Tổng chi tiêu</p>
-            <h3 className="text-2xl font-bold text-gray-900">{summary.totalExpense.toLocaleString('vi-VN')}đ</h3>
-            <p className="text-sm text-red-600 flex items-center gap-1 mt-1">
-              <ArrowDownCircle className="w-4 h-4" /> -8.3%
-            </p>
-          </div>
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
-            <Wallet className="w-6 h-6" />
+          <div className="w-14 h-14 bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-500/20 dark:to-primary-500/10 rounded-2xl flex items-center justify-center text-primary-600 dark:text-primary-400 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 relative z-10">
+            <Wallet className="w-7 h-7" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Số dư hiện tại</p>
-            <h3 className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {/* Total Expense Card */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-rose-500/10 dark:bg-rose-500/5 rounded-full blur-2xl"></div>
+          <div className="relative z-10">
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_expense')}</p>
+            <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalExpense.toLocaleString('vi-VN')}đ</h3>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg mt-3 border border-rose-100 dark:border-rose-500/20">
+              <ArrowDownCircle className="w-4 h-4" /> 
+              <span>-8.3%</span>
+            </div>
+          </div>
+          <div className="w-14 h-14 bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-500/20 dark:to-rose-500/10 rounded-2xl flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 relative z-10">
+            <Wallet className="w-7 h-7" />
+          </div>
+        </div>
+
+        {/* Current Balance Card */}
+        <div className="bg-gradient-to-br from-primary-600 to-primary-800 p-6 rounded-[24px] shadow-lg shadow-primary-500/30 transition-all duration-300 hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden text-white border border-primary-500/50">
+          <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -left-4 -top-4 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+          <div className="relative z-10">
+            <p className="text-sm font-bold text-primary-100 mb-2 tracking-wide uppercase">{t('dashboard_current_balance')}</p>
+            <h3 className="text-3xl font-extrabold tracking-tight">
               {summary.balance.toLocaleString('vi-VN')}đ
             </h3>
-            <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-               9.12.5%
+            <p className="text-sm text-primary-200 font-medium mt-3 flex items-center gap-1.5">
+               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+               Updated today
             </p>
           </div>
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-            <Wallet className="w-6 h-6" />
+          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300 relative z-10 border border-white/20">
+            <Wallet className="w-7 h-7" />
           </div>
         </div>
       </div>
 
       {/* Biểu đồ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Biểu đồ tròn */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Chi tiêu theo danh mục</h3>
-          <div className="flex items-center">
-            <div className="h-64 flex-1">
+        <div className="bg-white dark:bg-gray-900 p-7 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">{t('dashboard_expense_by_category')}</h3>
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="h-64 flex-1 w-full">
               {pieData.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-sm text-gray-400">Chưa có dữ liệu chi tiêu</div>
+                <div className="h-full flex items-center justify-center text-sm text-gray-400 font-medium bg-gray-50 dark:bg-gray-800/50 rounded-2xl">{t('dashboard_no_expense_data')}</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -136,29 +148,34 @@ const Dashboard = () => {
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
+                      innerRadius={65}
+                      outerRadius={85}
+                      paddingAngle={6}
                       dataKey="value"
+                      stroke="none"
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip formatter={(value) => `${value.toLocaleString('vi-VN')}đ`} />
+                    <RechartsTooltip 
+                      formatter={(value) => `${value.toLocaleString('vi-VN')}đ`} 
+                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: '600', backgroundColor: 'var(--tw-colors-gray-900)', color: 'white' }}
+                      itemStyle={{ color: 'white' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
-            <div className="w-48">
-              <ul className="space-y-3">
+            <div className="w-full md:w-56 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+              <ul className="space-y-4">
                 {pieData.map((item, index) => (
                   <li key={index} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
-                      <span className="text-gray-600 text-left block max-w-[100px] truncate capitalize">{item.name}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium max-w-[100px] truncate capitalize">{item.name}</span>
                     </span>
-                    <span className="font-medium">{item.value.toLocaleString('vi-VN')}đ</span>
+                    <span className="font-bold text-gray-900 dark:text-white">{item.value.toLocaleString('vi-VN')}đ</span>
                   </li>
                 ))}
               </ul>
@@ -167,17 +184,21 @@ const Dashboard = () => {
         </div>
 
         {/* Biểu đồ đường */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Thu nhập vs Chi tiêu</h3>
+        <div className="bg-white dark:bg-gray-900 p-7 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">{t('dashboard_income_vs_expense')}</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(value) => value >= 1000000 ? `${value/1000000}M` : value} />
-                <RechartsTooltip formatter={(value) => `${value.toLocaleString('vi-VN')}đ`} />
-                <Line type="monotone" dataKey="income" name="Thu nhập" stroke="#10b981" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
-                <Line type="monotone" dataKey="expense" name="Chi tiêu" stroke="#ef4444" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
+              <LineChart data={lineData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" strokeOpacity={0.5} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} tickFormatter={(value) => value >= 1000000 ? `${value/1000000}M` : value} dx={-10} />
+                <RechartsTooltip 
+                  formatter={(value) => `${value.toLocaleString('vi-VN')}đ`}
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: '600', backgroundColor: 'var(--tw-colors-gray-900)', color: 'white' }}
+                  itemStyle={{ color: 'white' }}
+                />
+                <Line type="monotone" dataKey="income" name={t('dashboard_income')} stroke="#10b981" strokeWidth={4} dot={{r: 0}} activeDot={{r: 8, strokeWidth: 0, fill: '#10b981'}} />
+                <Line type="monotone" dataKey="expense" name={t('dashboard_expense')} stroke="#f43f5e" strokeWidth={4} dot={{r: 0}} activeDot={{r: 8, strokeWidth: 0, fill: '#f43f5e'}} />
               </LineChart>
             </ResponsiveContainer>
           </div>

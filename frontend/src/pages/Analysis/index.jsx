@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, Clock, Coffee } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { getBehaviorAnalytics } from '../../services/analyticsService';
+import { useTheme } from '../../context/ThemeContext';
 
 const Analysis = () => {
   const [analysisData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { t } = useTheme();
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -14,7 +16,7 @@ const Analysis = () => {
         const res = await getBehaviorAnalytics();
         setAnalyticsData(res);
       } catch (err) {
-        setError('Không thể tải dữ liệu phân tích hành vi.');
+        setError(t('analysis_error_api'));
       } finally {
         setLoading(false);
       }
@@ -22,7 +24,7 @@ const Analysis = () => {
     fetchAnalysis();
   }, []);
 
-  if (loading) return <div className="text-center py-10 text-gray-500">Đang chạy thuật toán phân tích chi tiêu...</div>;
+  if (loading) return <div className="text-center py-10 text-gray-500">{t('analysis_loading')}</div>;
   if (error) return <div className="text-red-500 text-center py-10">{error}</div>;
 
   const { trendPercentage, miniChartData, topCategory, topTimeSlot } = analysisData;
@@ -34,62 +36,75 @@ const Analysis = () => {
     'shopping': 'Mua sắm',
     'bills': 'Hóa đơn',
     'entertainment': 'Giải trí',
-    'other': 'Khác'
+    'other': t('cat_other')
   };
 
-  const displayName = categoryTranslation[topCategory.name] || topCategory.name;
+  const displayName = categoryTranslation[topCategory.name] || t(`cat_${topCategory.name}`) || topCategory.name;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-h-[calc(100vh-8rem)]">
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-800">Phân tích hành vi</h2>
-        <p className="text-sm text-gray-500 mt-1">Góc nhìn sâu hơn về thói quen chi tiêu của bạn</p>
+    <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 p-8 min-h-[calc(100vh-8rem)] max-w-6xl mx-auto animate-in fade-in duration-500">
+      <div className="mb-10">
+        <h2 className="text-2xl font-black text-gray-800 tracking-tight">{t('analysis_title')}</h2>
+        <p className="text-sm text-gray-500 font-medium mt-1">{t('analysis_subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card 1: Xu hướng chi tiêu */}
-        <div className="border border-gray-100 rounded-xl p-6 bg-gradient-to-br from-blue-50 to-white">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Xu hướng chi tiêu</p>
-              <h3 className="text-lg font-bold text-gray-800 mt-1 flex items-center gap-2">
-                Tăng {trendPercentage}% <TrendingUp className="w-4 h-4 text-red-500" />
-              </h3>
+        <div className="rounded-3xl p-6 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-xl shadow-indigo-200/50 hover:shadow-2xl hover:shadow-indigo-300/50 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <p className="text-xs font-bold text-white/70 uppercase tracking-widest">{t('analysis_trend')}</p>
+                <h3 className="text-2xl font-black text-white mt-1 flex items-center gap-2">
+                  {t('analysis_trend_increase')} {trendPercentage}% <TrendingUp className="w-6 h-6 text-rose-300 drop-shadow-sm" />
+                </h3>
+              </div>
             </div>
-          </div>
-          <div className="h-20 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={miniChartData}>
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="h-24 w-full mt-4 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={miniChartData}>
+                  <Line type="monotone" dataKey="value" stroke="rgba(255,255,255,0.8)" strokeWidth={3} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
         {/* Card 2: Danh mục chi nhiều nhất */}
-        <div className="border border-gray-100 rounded-xl p-6 bg-gradient-to-br from-orange-50 to-white">
-          <p className="text-sm font-medium text-gray-500 mb-4">Danh mục chi nhiều nhất</p>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-              <Coffee className="w-6 h-6 text-orange-500" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800 capitalize">{displayName}</h3>
-              <p className="text-sm text-gray-500 font-medium mt-1">{topCategory.percentage}% tổng chi</p>
+        <div className="rounded-3xl p-6 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-xl shadow-orange-200/50 hover:shadow-2xl hover:shadow-orange-300/50 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10 flex flex-col h-full justify-between">
+            <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-6">{t('analysis_top_category')}</p>
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
+                <Coffee className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-white capitalize tracking-tight">{displayName}</h3>
+                <p className="text-sm text-white/80 font-bold mt-1 bg-white/10 inline-block px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                  {topCategory.percentage}{t('analysis_top_category_percent')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Card 3: Thời điểm chi nhiều nhất */}
-        <div className="border border-gray-100 rounded-xl p-6 bg-gradient-to-br from-purple-50 to-white">
-          <p className="text-sm font-medium text-gray-500 mb-4">Thời điểm chi nhiều nhất</p>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-              <Clock className="w-6 h-6 text-purple-500" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">{topTimeSlot.name}</h3>
-              <p className="text-sm text-gray-500 font-medium mt-1">{topTimeSlot.slot || '(18h - 21h)'}</p>
+        <div className="rounded-3xl p-6 bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white shadow-xl shadow-purple-200/50 hover:shadow-2xl hover:shadow-purple-300/50 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10 flex flex-col h-full justify-between">
+            <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-6">{t('analysis_top_time')}</p>
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-white tracking-tight">{topTimeSlot.name}</h3>
+                <p className="text-sm text-white/80 font-bold mt-1 bg-white/10 inline-block px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                  {topTimeSlot.slot || '(18h - 21h)'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
