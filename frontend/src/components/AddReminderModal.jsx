@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { createReminder } from '../services/reminderService';
+import { useTheme } from '../context/ThemeContext';
 
 const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState('');
@@ -9,6 +11,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useTheme();
 
   useEffect(() => {
     if (isOpen) {
@@ -21,7 +24,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async () => {
     if (!title || !dueDate) {
-      setError('Vui lòng nhập tiêu đề và ngày đến hạn');
+      setError(t('reminders_modal_err_validation'));
       return;
     }
     
@@ -36,7 +39,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi thêm nhắc nhở');
+      setError(err.response?.data?.message || t('reminders_modal_err_add'));
     } finally {
       setLoading(false);
     }
@@ -44,7 +47,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
@@ -52,14 +55,14 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
         </button>
         
         <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-800">Thêm nhắc nhở mới</h2>
+          <h2 className="text-xl font-bold text-gray-800">{t('reminders_modal_title')}</h2>
         </div>
 
         <div className="p-6 space-y-5">
           {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề (VD: Hóa đơn điện)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('reminders_modal_title_label')}</label>
             <input 
               type="text" 
               value={title}
@@ -69,7 +72,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền dự kiến (tùy chọn)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('reminders_modal_amount_label')}</label>
             <div className="relative">
               <input
                 type="number"
@@ -83,7 +86,7 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày đến hạn</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('reminders_modal_due_date_label')}</label>
             <input 
               type="date" 
               value={dueDate}
@@ -99,18 +102,19 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-white border rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Hủy
+            {t('reminders_modal_cancel')}
           </button>
           <button 
             onClick={handleSubmit}
             disabled={loading}
             className="flex-1 px-4 py-2 bg-green-600 rounded-lg font-medium text-white hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
           >
-            {loading ? 'Đang thêm...' : 'Lưu nhắc nhở'}
+            {loading ? t('reminders_modal_save_loading') : t('reminders_modal_save')}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
