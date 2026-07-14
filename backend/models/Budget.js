@@ -22,4 +22,5 @@ const budgetSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Đảm bảo dòng này export đúng tên 'Budget' và biến 'budgetSchema' (viết hoa viết thường phải chuẩn)
 module.exports = mongoose.model('Budget', budgetSchema);

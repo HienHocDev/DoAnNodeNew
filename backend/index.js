@@ -29,8 +29,11 @@ app.use('/api/wallets', require('./routes/walletRoutes'));
 app.use('/api/reminders', require('./routes/reminderRoutes'));
 // app.use('/api/budgets', require('./routes/budgetRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
-
+app.use('/api/budgets', require('./routes/budgetRoutes'));
+app.use('/api/goals', require('./routes/goalRoutes'));
 const PORT = process.env.PORT || 5000;
+
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);

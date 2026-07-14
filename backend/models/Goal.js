@@ -8,7 +8,7 @@ const goalSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true,
+    required: true, // Ví dụ: "Mua xe máy", "Tiền tiết kiệm"
   },
   targetAmount: {
     type: Number,
@@ -21,10 +21,6 @@ const goalSchema = new mongoose.Schema({
   deadline: {
     type: Date,
     required: true,
-  },
-  icon: {
-    type: String,
-    default: 'Target',
   }
 }, {
   timestamps: true,
