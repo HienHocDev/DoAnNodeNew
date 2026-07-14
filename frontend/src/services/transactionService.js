@@ -1,7 +1,9 @@
 import api from './api';
 
-export const getTransactions = async () => {
-  const response = await api.get('/transactions');
+export const getTransactions = async ({ type, month, year } = {}) => {
+  const response = await api.get('/transactions', {
+    params: { type: type === 'all' ? undefined : type, month, year }
+  });
   return response.data;
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Clock, Coffee } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, Coffee } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { getBehaviorAnalytics } from '../../services/analyticsService';
 import { useTheme } from '../../context/ThemeContext';
@@ -8,12 +8,15 @@ const Analysis = () => {
   const [analysisData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const { t } = useTheme();
 
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const res = await getBehaviorAnalytics();
+        setLoading(true);
+        setError('');
+        const res = await getBehaviorAnalytics(selectedMonth);
         setAnalyticsData(res);
       } catch (err) {
         setError(t('analysis_error_api'));
@@ -22,7 +25,7 @@ const Analysis = () => {
       }
     };
     fetchAnalysis();
-  }, []);
+  }, [selectedMonth, t]);
 
   if (loading) return <div className="text-center py-10 text-gray-500">{t('analysis_loading')}</div>;
   if (error) return <div className="text-red-500 text-center py-10">{error}</div>;
@@ -39,13 +42,17 @@ const Analysis = () => {
     'other': t('cat_other')
   };
 
-  const displayName = categoryTranslation[topCategory.name] || t(`cat_${topCategory.name}`) || topCategory.name;
+  const displayName = categoryTranslation[topCategory.name] || topCategory.name;
+  const trendLabel = trendPercentage === null
+    ? 'Mới'
+    : `${trendPercentage > 0 ? 'Tăng' : trendPercentage < 0 ? 'Giảm' : 'Không đổi'} ${Math.abs(trendPercentage).toFixed(1)}%`;
 
   return (
     <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 p-8 min-h-[calc(100vh-8rem)] max-w-6xl mx-auto animate-in fade-in duration-500">
       <div className="mb-10">
         <h2 className="text-2xl font-black text-gray-800 tracking-tight">{t('analysis_title')}</h2>
         <p className="text-sm text-gray-500 font-medium mt-1">{t('analysis_subtitle')}</p>
+        <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-4 border border-gray-200 rounded-xl px-4 py-2 bg-white text-gray-700" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -57,7 +64,7 @@ const Analysis = () => {
               <div>
                 <p className="text-xs font-bold text-white/70 uppercase tracking-widest">{t('analysis_trend')}</p>
                 <h3 className="text-2xl font-black text-white mt-1 flex items-center gap-2">
-                  {t('analysis_trend_increase')} {trendPercentage}% <TrendingUp className="w-6 h-6 text-rose-300 drop-shadow-sm" />
+                  {trendLabel} {trendPercentage !== null && trendPercentage < 0 ? <TrendingDown className="w-6 h-6 text-emerald-300" /> : <TrendingUp className="w-6 h-6 text-rose-300" />}
                 </h3>
               </div>
             </div>
@@ -102,7 +109,7 @@ const Analysis = () => {
               <div>
                 <h3 className="text-2xl font-black text-white tracking-tight">{topTimeSlot.name}</h3>
                 <p className="text-sm text-white/80 font-bold mt-1 bg-white/10 inline-block px-2.5 py-1 rounded-lg backdrop-blur-sm">
-                  {topTimeSlot.slot || '(18h - 21h)'}
+                  {topTimeSlot.slot}
                 </p>
               </div>
             </div>

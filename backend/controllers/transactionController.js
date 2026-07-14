@@ -6,12 +6,35 @@ const Wallet = require('../models/Wallet');
 // @access  Private
 const getTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find({ user: req.user._id })
+    const { type, month, year } = req.query;
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[transactions] query:', req.query);
+    }
+    if (type && !['income', 'expense'].includes(type)) {
+      return res.status(400).json({ message: 'Loại giao dịch không hợp lệ' });
+    }
+
+    const filter = { user: req.user._id };
+    if (type) filter.type = type;
+
+    if (month !== undefined || year !== undefined) {
+      const numericMonth = Number(month);
+      const numericYear = Number(year);
+      if (!Number.isInteger(numericMonth) || numericMonth < 1 || numericMonth > 12 || !Number.isInteger(numericYear) || numericYear < 1) {
+        return res.status(400).json({ message: 'Tháng hoặc năm không hợp lệ' });
+      }
+      filter.date = {
+        $gte: new Date(Date.UTC(numericYear, numericMonth - 1, 1)),
+        $lt: new Date(Date.UTC(numericYear, numericMonth, 1))
+      };
+    }
+
+    const transactions = await Transaction.find(filter)
       .populate('wallet', 'name icon')
       .sort({ date: -1 });
-    res.json(transactions);
+    return res.json(transactions);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 

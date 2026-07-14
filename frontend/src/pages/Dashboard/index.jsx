@@ -8,12 +8,15 @@ const Dashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const { t } = useTheme();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const res = await getDashboardAnalytics();
+        setLoading(true);
+        setError('');
+        const res = await getDashboardAnalytics(selectedMonth);
         setAnalyticsData(res);
       } catch (err) {
         setError(t('dashboard_error_api'));
@@ -22,7 +25,7 @@ const Dashboard = () => {
       }
     };
     fetchAnalytics();
-  }, []);
+  }, [selectedMonth, t]);
 
   if (loading) return <div className="text-center py-10 text-gray-500">{t('dashboard_loading')}</div>;
   if (error) return <div className="text-red-500 text-center py-10">{error}</div>;
@@ -70,14 +73,18 @@ const Dashboard = () => {
   // Đổ dữ liệu thật từ API vào lineData
   const lineData = analyticsData.trendData.map(item => ({
     date: item.name,
-    income: item['Thu nhập'],
-    expense: item['Chi tiêu']
+    income: item.income,
+    expense: item.expense
   }));
 
   const { summary } = analyticsData;
+  const formatChange = (value) => value === null ? 'Mới' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <div className="flex justify-end">
+        <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2 bg-white dark:bg-gray-900 dark:text-white" />
+      </div>
       {/* Cards Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Income Card */}
@@ -86,9 +93,9 @@ const Dashboard = () => {
           <div className="relative z-10">
             <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_income')}</p>
             <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalIncome.toLocaleString('vi-VN')}đ</h3>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold rounded-lg mt-3 border border-green-100 dark:border-green-500/20">
-              <ArrowUpCircle className="w-4 h-4" /> 
-              <span>+12.5%</span>
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg mt-3 border ${summary.incomeChange === null || summary.incomeChange >= 0 ? 'bg-green-50 text-green-600 border-green-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+              {summary.incomeChange === null || summary.incomeChange >= 0 ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
+              <span>{formatChange(summary.incomeChange)}</span>
             </div>
           </div>
           <div className="w-14 h-14 bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-500/20 dark:to-primary-500/10 rounded-2xl flex items-center justify-center text-primary-600 dark:text-primary-400 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 relative z-10">
@@ -102,9 +109,9 @@ const Dashboard = () => {
           <div className="relative z-10">
             <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_expense')}</p>
             <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalExpense.toLocaleString('vi-VN')}đ</h3>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg mt-3 border border-rose-100 dark:border-rose-500/20">
-              <ArrowDownCircle className="w-4 h-4" /> 
-              <span>-8.3%</span>
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg mt-3 border ${summary.expenseChange !== null && summary.expenseChange > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+              {summary.expenseChange !== null && summary.expenseChange > 0 ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
+              <span>{formatChange(summary.expenseChange)}</span>
             </div>
           </div>
           <div className="w-14 h-14 bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-500/20 dark:to-rose-500/10 rounded-2xl flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 relative z-10">
@@ -191,7 +198,7 @@ const Dashboard = () => {
               <LineChart data={lineData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" strokeOpacity={0.5} />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} tickFormatter={(value) => value >= 1000000 ? `${value/1000000}M` : value} dx={-10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value)} dx={-10} />
                 <RechartsTooltip 
                   formatter={(value) => `${value.toLocaleString('vi-VN')}đ`}
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: '600', backgroundColor: 'var(--tw-colors-gray-900)', color: 'white' }}
