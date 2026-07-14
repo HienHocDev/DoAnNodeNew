@@ -49,9 +49,9 @@ const Settings = () => {
       const updatedUser = await updateProfile(updateData);
       const token = localStorage.getItem('token');
       loginContext(updatedUser, token);
-      setMessage({ type: 'success', text: 'Cập nhật hồ sơ thành công!' });
+      setMessage({ type: 'success', text: t('settings_msg_profile_success') });
     } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật' });
+      setMessage({ type: 'error', text: error.response?.data?.message || t('settings_msg_profile_error') });
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ const Settings = () => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
     if (!password) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập mật khẩu mới' });
+      setMessage({ type: 'error', text: t('settings_msg_pwd_empty') });
       return;
     }
     setLoading(true);
@@ -69,10 +69,10 @@ const Settings = () => {
       const updatedUser = await updateProfile({ password });
       const token = localStorage.getItem('token');
       loginContext(updatedUser, token);
-      setMessage({ type: 'success', text: 'Đổi mật khẩu thành công!' });
+      setMessage({ type: 'success', text: t('settings_msg_pwd_success') });
       setPassword('');
     } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật' });
+      setMessage({ type: 'error', text: error.response?.data?.message || t('settings_msg_profile_error') });
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ const Settings = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setMessage({ type: 'error', text: 'Ảnh không được vượt quá 5MB' });
+        setMessage({ type: 'error', text: t('settings_msg_avatar_size') });
         return;
       }
       const reader = new FileReader();
@@ -112,18 +112,18 @@ const Settings = () => {
       document.body.appendChild(downloadAnchorNode); // required for firefox
       downloadAnchorNode.click();
       downloadAnchorNode.remove();
-      setMessage({ type: 'success', text: 'Đã tải xuống bản sao lưu dữ liệu!' });
+      setMessage({ type: 'success', text: t('settings_msg_backup_success') });
     } catch (error) {
-      setMessage({ type: 'error', text: 'Không thể tạo bản sao lưu lúc này.' });
+      setMessage({ type: 'error', text: t('settings_msg_backup_error') });
     }
   };
 
-  const renderTabContent = () => {
+    const renderTabContent = () => {
     switch (activeTab) {
       case 'profile':
         return (
           <>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">Hồ sơ cá nhân</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">{t('settings_tab_profile')}</h3>
             <div className="flex items-center gap-6 mb-8">
               <div className="w-24 h-24 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-700 dark:text-green-400 font-bold text-3xl border-4 border-white dark:border-gray-800 shadow-md uppercase overflow-hidden shrink-0">
                 {avatar ? (
@@ -144,15 +144,15 @@ const Settings = () => {
                   onClick={() => fileInputRef.current.click()}
                   className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Thay đổi ảnh đại diện
+                  {t('settings_profile_avatar_change')}
                 </button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Định dạng JPG, PNG. Tối đa 5MB.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{t('settings_profile_avatar_hint')}</p>
               </div>
             </div>
 
             <form className="max-w-md space-y-5" onSubmit={handleSubmitProfile}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Họ và tên</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings_profile_name')}</label>
                 <input 
                   type="text" 
                   value={name}
@@ -162,7 +162,7 @@ const Settings = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email <span className="text-gray-400 text-xs font-normal">(Không thể thay đổi)</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings_profile_email')} <span className="text-gray-400 text-xs font-normal">{t('settings_profile_email_hint')}</span></label>
                 <input 
                   type="email" 
                   value={email}
@@ -171,12 +171,12 @@ const Settings = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Số điện thoại</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings_profile_phone')}</label>
                 <input 
                   type="tel" 
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Nhập số điện thoại..."
+                  placeholder={t('settings_profile_phone_placeholder')}
                   className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" 
                 />
               </div>
@@ -186,7 +186,7 @@ const Settings = () => {
                   disabled={loading}
                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {loading ? 'Đang lưu...' : 'Lưu hồ sơ'}
+                  {loading ? t('settings_profile_saving') : t('settings_profile_save')}
                 </button>
               </div>
             </form>
@@ -196,16 +196,16 @@ const Settings = () => {
       case 'password':
         return (
           <>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">Đổi mật khẩu</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">{t('settings_tab_password')}</h3>
             <form className="max-w-md space-y-5" onSubmit={handleSubmitPassword}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mật khẩu mới</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings_password_new')}</label>
                 <input 
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="Nhập mật khẩu mới"
+                  placeholder={t('settings_password_new_placeholder')}
                   className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" 
                 />
               </div>
@@ -215,7 +215,7 @@ const Settings = () => {
                   disabled={loading}
                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {loading ? 'Đang lưu...' : 'Lưu mật khẩu'}
+                  {loading ? t('settings_profile_saving') : t('settings_password_save')}
                 </button>
               </div>
             </form>
@@ -225,12 +225,12 @@ const Settings = () => {
       case 'notifications':
         return (
           <>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">Cài đặt thông báo</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">{t('settings_tab_notifications')}</h3>
             <div className="max-w-md space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-gray-200">Nhắc nhở qua Email</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Nhận email khi có hóa đơn sắp đến hạn</p>
+                  <p className="font-medium text-gray-800 dark:text-gray-200">{t('settings_notif_email')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings_notif_email_desc')}</p>
                 </div>
                 <button 
                   onClick={() => setEmailNotif(!emailNotif)}
@@ -241,8 +241,8 @@ const Settings = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-gray-200">Thông báo biến động số dư</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Thông báo khi có giao dịch lớn bất thường</p>
+                  <p className="font-medium text-gray-800 dark:text-gray-200">{t('settings_notif_balance')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings_notif_balance_desc')}</p>
                 </div>
                 <button 
                   onClick={() => setBalanceNotif(!balanceNotif)}
@@ -258,16 +258,16 @@ const Settings = () => {
       case 'backup':
         return (
           <>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">Sao lưu dữ liệu</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">{t('settings_tab_backup')}</h3>
             <div className="max-w-md">
               <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
-                Bạn có thể tải xuống toàn bộ dữ liệu (giao dịch, ví, thông tin) để lưu trữ an toàn trên máy tính của bạn.
+                {t('settings_backup_desc')}
               </p>
               <button 
                 onClick={handleBackup}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
-                <Database className="w-4 h-4" /> Tải bản sao lưu (.JSON)
+                <Database className="w-4 h-4" /> {t('settings_backup_btn')}
               </button>
             </div>
           </>
@@ -276,7 +276,7 @@ const Settings = () => {
       case 'language':
         return (
           <>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">Ngôn ngữ</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b dark:border-gray-700 pb-4">{t('settings_tab_language')}</h3>
             <div className="max-w-md space-y-4">
               <label className="flex items-center gap-3 p-4 border dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <input 
@@ -286,7 +286,7 @@ const Settings = () => {
                   onChange={() => changeLanguage('vi')}
                   className="w-4 h-4 text-green-600 focus:ring-green-500" 
                 />
-                <span className="font-medium text-gray-800 dark:text-gray-200">Tiếng Việt</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{t('settings_lang_vi')}</span>
               </label>
               <label className="flex items-center gap-3 p-4 border dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <input 
@@ -296,7 +296,7 @@ const Settings = () => {
                   onChange={() => changeLanguage('en')}
                   className="w-4 h-4 text-green-600 focus:ring-green-500" 
                 />
-                <span className="font-medium text-gray-800 dark:text-gray-200">English (Tiếng Anh)</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{t('settings_lang_en')}</span>
               </label>
             </div>
           </>
@@ -316,45 +316,48 @@ const Settings = () => {
   ];
 
   return (
-    <div className="flex gap-6 min-h-[calc(100vh-8rem)]">
+    <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-8 min-h-[calc(100vh-8rem)] animate-in fade-in duration-500">
       {/* Sidebar Cài đặt */}
-      <div className="w-64 shrink-0 space-y-1">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-6 px-4">{t('settings_title')}</h2>
+      <div className="w-full md:w-72 shrink-0 bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 p-6 flex flex-col gap-2">
+        <h2 className="text-2xl font-black text-gray-800 dark:text-gray-100 mb-4 px-2 tracking-tight">{t('settings_title')}</h2>
         
-        {menuItems.map(item => (
-          <button 
-            key={item.id}
-            onClick={() => {
-              setActiveTab(item.id);
-              setMessage({ type: '', text: '' });
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
-              activeTab === item.id 
-                ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            <item.icon className="w-5 h-5" /> {item.label}
-          </button>
-        ))}
+        <div className="space-y-1">
+          {menuItems.map(item => (
+            <button 
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                setMessage({ type: '', text: '' });
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-bold transition-all duration-300 ${
+                activeTab === item.id 
+                  ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shadow-sm border border-emerald-200/50' 
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 border border-transparent'
+              }`}
+            >
+              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-emerald-600' : 'text-gray-400'}`} /> {item.label}
+            </button>
+          ))}
+        </div>
         
-        <div className="pt-4 mt-4 border-t dark:border-gray-800 px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400 font-medium">
-            <Moon className="w-5 h-5" /> {t('settings_dark_mode')}
+        <div className="mt-auto pt-6 border-t border-gray-100/80 dark:border-gray-800 px-2 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400 font-bold text-sm">
+            <Moon className="w-5 h-5 text-indigo-400" /> {t('settings_dark_mode')}
           </div>
           <button 
             onClick={toggleDarkMode}
-            className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer focus:outline-none ${darkMode ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            className={`w-12 h-6 rounded-full relative transition-colors duration-300 cursor-pointer focus:outline-none shadow-inner ${darkMode ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-700'}`}
           >
-            <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`}></div>
+            <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-transform duration-300 ${darkMode ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
           </button>
         </div>
       </div>
 
       {/* Nội dung chi tiết */}
-      <div className="flex-1 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 transition-colors duration-200">
+      <div className="flex-1 bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/60 dark:bg-gray-900 dark:border-gray-800 p-8 md:p-10 transition-colors duration-200">
         {message.text && (
-          <div className={`mb-6 p-4 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400' : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400'}`}>
+          <div className={`mb-8 p-4 rounded-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm' : 'bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm'}`}>
+            <div className={`w-2 h-2 rounded-full ${message.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
             {message.text}
           </div>
         )}

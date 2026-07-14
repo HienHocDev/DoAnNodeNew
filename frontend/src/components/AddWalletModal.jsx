@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Wallet, CreditCard, Banknote } from 'lucide-react';
 import { createWallet } from '../services/walletService';
+import { useTheme } from '../context/ThemeContext';
 
 const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
   const [name, setName] = useState('');
@@ -10,11 +12,12 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useTheme();
 
   const icons = [
-    { id: 'Wallet', icon: Wallet, label: 'Ví', bg: 'bg-blue-100', color: 'text-blue-600' },
-    { id: 'Banknote', icon: Banknote, label: 'Tiền mặt', bg: 'bg-green-100', color: 'text-green-600' },
-    { id: 'CreditCard', icon: CreditCard, label: 'Thẻ', bg: 'bg-purple-100', color: 'text-purple-600' },
+    { id: 'Wallet', icon: Wallet, label: t('wallets_icon_wallet'), bg: 'bg-blue-100', color: 'text-blue-600' },
+    { id: 'Banknote', icon: Banknote, label: t('wallets_icon_banknote'), bg: 'bg-green-100', color: 'text-green-600' },
+    { id: 'CreditCard', icon: CreditCard, label: t('wallets_icon_card'), bg: 'bg-purple-100', color: 'text-purple-600' },
   ];
 
   useEffect(() => {
@@ -29,7 +32,7 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async () => {
     if (!name) {
-      setError('Vui lòng nhập tên ví');
+      setError(t('wallets_error_name'));
       return;
     }
     
@@ -45,7 +48,7 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi thêm ví');
+      setError(err.response?.data?.message || t('wallets_error_add'));
     } finally {
       setLoading(false);
     }
@@ -53,7 +56,7 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
@@ -61,25 +64,25 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
         </button>
         
         <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-800">Thêm ví mới</h2>
+          <h2 className="text-xl font-bold text-gray-800">{t('wallets_modal_title')}</h2>
         </div>
 
         <div className="p-6 space-y-5">
           {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tên ví / Tài khoản</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('wallets_name_label')}</label>
             <input 
               type="text" 
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="VD: Tiền mặt, Thẻ tín dụng..." 
+              placeholder={t('wallets_name_placeholder')} 
               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" 
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số dư ban đầu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('wallets_balance_label')}</label>
             <div className="relative">
               <input
                 type="number"
@@ -93,7 +96,7 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Biểu tượng</label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">{t('wallets_icon_label')}</label>
             <div className="flex gap-4">
               {icons.map((item) => (
                 <button
@@ -119,7 +122,7 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
               className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
             />
             <label htmlFor="isDefault" className="text-sm text-gray-700 cursor-pointer">
-              Đặt làm ví mặc định
+              {t('wallets_set_default')}
             </label>
           </div>
         </div>
@@ -130,18 +133,19 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-white border rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Hủy
+            {t('wallets_cancel')}
           </button>
           <button 
             onClick={handleSubmit}
             disabled={loading}
             className="flex-1 px-4 py-2 bg-green-600 rounded-lg font-medium text-white hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
           >
-            {loading ? 'Đang thêm...' : 'Thêm ví'}
+            {loading ? t('wallets_add_loading') : t('wallets_add_btn_modal')}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

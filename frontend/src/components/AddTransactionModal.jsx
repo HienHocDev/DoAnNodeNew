@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Coffee, Car, ShoppingBag, Receipt, Gamepad2, MoreHorizontal, ArrowUpCircle } from 'lucide-react';
-import { createTransaction } from '../services/transactionService';
 import { getWallets } from '../services/walletService';
+import { createTransaction } from '../services/transactionService';
+import { useTheme } from '../context/ThemeContext';
 
 const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   const [type, setType] = useState('expense'); // 'expense' or 'income'
@@ -14,19 +16,20 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   const [wallets, setWallets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useTheme();
 
   const expenseCategories = [
-    { id: 'food', name: 'Ăn uống', icon: Coffee, color: 'text-orange-500', bg: 'bg-orange-100' },
-    { id: 'transport', name: 'Di chuyển', icon: Car, color: 'text-blue-500', bg: 'bg-blue-100' },
-    { id: 'shopping', name: 'Mua sắm', icon: ShoppingBag, color: 'text-purple-500', bg: 'bg-purple-100' },
-    { id: 'bills', name: 'Hóa đơn', icon: Receipt, color: 'text-red-500', bg: 'bg-red-100' },
-    { id: 'entertainment', name: 'Giải trí', icon: Gamepad2, color: 'text-pink-500', bg: 'bg-pink-100' },
-    { id: 'other', name: 'Khác', icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
+    { id: 'food', name: t('cat_food'), icon: Coffee, color: 'text-orange-500', bg: 'bg-orange-100' },
+    { id: 'transport', name: t('cat_transport'), icon: Car, color: 'text-blue-500', bg: 'bg-blue-100' },
+    { id: 'shopping', name: t('cat_shopping'), icon: ShoppingBag, color: 'text-purple-500', bg: 'bg-purple-100' },
+    { id: 'bills', name: t('cat_bills'), icon: Receipt, color: 'text-red-500', bg: 'bg-red-100' },
+    { id: 'entertainment', name: t('cat_entertainment'), icon: Gamepad2, color: 'text-pink-500', bg: 'bg-pink-100' },
+    { id: 'other', name: t('cat_other'), icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
   ];
 
   const incomeCategories = [
-    { id: 'salary', name: 'Lương', icon: ArrowUpCircle, color: 'text-green-500', bg: 'bg-green-100' },
-    { id: 'other', name: 'Khác', icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
+    { id: 'salary', name: t('cat_salary'), icon: ArrowUpCircle, color: 'text-green-500', bg: 'bg-green-100' },
+    { id: 'other', name: t('cat_other'), icon: MoreHorizontal, color: 'text-gray-500', bg: 'bg-gray-100' },
   ];
 
   const currentCategories = type === 'expense' ? expenseCategories : incomeCategories;
@@ -50,7 +53,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
             setWalletId(data[0]._id);
           }
         } catch (err) {
-          console.error('Lỗi khi tải ví', err);
+          console.error(t('transactions_modal_err_fetch_wallets'), err);
         }
       };
       fetchWallets();
@@ -59,7 +62,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async () => {
     if (!amount || !walletId) {
-      setError('Vui lòng nhập số tiền và chọn ví');
+      setError(t('transactions_modal_err_validation'));
       return;
     }
     
@@ -77,7 +80,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi thêm giao dịch');
+      setError(err.response?.data?.message || t('transactions_modal_err_add'));
     } finally {
       setLoading(false);
     }
@@ -85,7 +88,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
@@ -102,7 +105,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
             }`}
             onClick={() => { setType('expense'); setCategory('food'); }}
           >
-            Chi tiêu
+            {t('transactions_expense')}
           </button>
           <button
             className={`flex-1 py-4 text-center font-semibold text-lg transition-colors ${
@@ -112,7 +115,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
             }`}
             onClick={() => { setType('income'); setCategory('salary'); }}
           >
-            Thu nhập
+            {t('transactions_income')}
           </button>
         </div>
 
@@ -122,7 +125,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
           
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('transactions_modal_amount')}</label>
             <div className="relative">
               <input
                 type="number"
@@ -137,7 +140,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
 
           {/* Categories Grid */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Danh mục</label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">{t('transactions_modal_category')}</label>
             <div className="grid grid-cols-4 gap-4">
               {currentCategories.map((cat) => (
                 <button
@@ -157,7 +160,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
           {/* Date & Wallet */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('transactions_modal_date')}</label>
               <input 
                 type="date" 
                 value={date}
@@ -166,13 +169,13 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ví</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('transactions_modal_wallet')}</label>
               <select 
                 value={walletId}
                 onChange={(e) => setWalletId(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none"
               >
-                {wallets.length === 0 ? <option value="">Đang tải ví...</option> : 
+                {wallets.length === 0 ? <option value="">{t('transactions_modal_wallet_loading')}</option> : 
                   wallets.map(w => <option key={w._id} value={w._id}>{w.name}</option>)
                 }
               </select>
@@ -181,12 +184,12 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
 
           {/* Note */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nội dung / Ghi chú</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('transactions_modal_note')}</label>
             <input 
               type="text" 
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ăn trưa cùng bạn..." 
+              placeholder={t('transactions_modal_note_placeholder')} 
               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none" 
             />
           </div>
@@ -199,18 +202,19 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-white border rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Hủy
+            {t('transactions_modal_cancel')}
           </button>
           <button 
             onClick={handleSubmit}
             disabled={loading}
             className="flex-1 px-4 py-2 bg-green-600 rounded-lg font-medium text-white hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
           >
-            {loading ? 'Đang lưu...' : 'Lưu giao dịch'}
+            {loading ? t('transactions_modal_save_loading') : t('transactions_modal_save')}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
