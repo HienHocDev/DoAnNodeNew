@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import html2pdf from 'html2pdf.js';
 import * as XLSX from 'xlsx';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
@@ -76,6 +77,21 @@ const Reports = () => {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[character]));
 
+  const getPdfSummary = (rows) => {
+    if (reportType === 'all') {
+      if (data.difference > 0) {
+        return `Thu nhập cao hơn chi tiêu ${data.difference.toLocaleString('vi-VN')}đ. Kỳ báo cáo đang ghi nhận thặng dư và khả năng tích lũy tích cực.`;
+      }
+      if (data.difference < 0) {
+        return `Chi tiêu cao hơn thu nhập ${Math.abs(data.difference).toLocaleString('vi-VN')}đ. Nên rà soát các khoản chi lớn để cân bằng dòng tiền.`;
+      }
+      return 'Thu nhập và chi tiêu đang cân bằng trong kỳ báo cáo.';
+    }
+    if (!rows.length) return 'Chưa có dữ liệu phát sinh trong kỳ để đưa ra đánh giá.';
+    const leading = [...rows].sort((first, second) => second.value - first.value)[0];
+    return `${leading.name} là nhóm chiếm tỷ trọng lớn nhất với ${leading.value.toLocaleString('vi-VN')}đ (${leading.percentage}). Báo cáo được tổng hợp từ dữ liệu giao dịch thực tế trong kỳ.`;
+  };
+
   const handleExportPDF = async () => {
     const reportContent = document.getElementById('report-content');
     if (!reportContent) {
@@ -85,36 +101,110 @@ const Reports = () => {
 
     const metadata = getExportMetadata();
     const rows = getExportRows();
+    const leadingRow = rows.length ? [...rows].sort((first, second) => second.value - first.value)[0] : null;
+    const summaryCards = reportType === 'all'
+      ? [
+          { label: 'Tổng thu nhập', value: data.totalIncome, color: '#047857', background: '#ecfdf5' },
+          { label: 'Tổng chi tiêu', value: data.totalExpense, color: '#be123c', background: '#fff1f2' },
+          { label: 'Chênh lệch', value: data.difference, color: '#1d4ed8', background: '#eff6ff' }
+        ]
+      : [
+          { label: reportType === 'expense' ? 'Tổng chi tiêu' : 'Tổng thu nhập', value: data.totalAmount, color: '#047857', background: '#ecfdf5' },
+          { label: 'Số danh mục', display: String(rows.length), color: '#1d4ed8', background: '#eff6ff' },
+          {
+            label: 'Danh mục nổi bật',
+            display: leadingRow?.name || 'Chưa có dữ liệu',
+            subtext: leadingRow ? `${leadingRow.value.toLocaleString('vi-VN')}đ · ${leadingRow.percentage}` : '',
+            color: '#6d28d9',
+            background: '#f5f3ff'
+          }
+        ];
+    const pdfSummary = getPdfSummary(rows);
     const exportHost = document.createElement('div');
     exportHost.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;opacity:1;visibility:visible;display:block;overflow:visible;z-index:-1;';
     const exportElement = document.createElement('div');
-    exportElement.style.cssText = 'box-sizing:border-box;width:794px;min-height:1123px;padding:32px;background:#ffffff;color:#1f2937;font-family:Arial,sans-serif;opacity:1;visibility:visible;display:block;';
+    exportElement.style.cssText = 'box-sizing:border-box;width:760px;margin:0 auto;padding:0 24px 16px;background:#f8fafc;color:#172033;font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.4;opacity:1;visibility:visible;display:block;overflow:hidden;';
     exportElement.innerHTML = `
-      <header style="text-align:center;border-bottom:3px solid #10b981;padding-bottom:18px;margin-bottom:22px">
-        <div style="font-size:28px;font-weight:800;color:#059669;letter-spacing:1px">FINANCE TRACKER</div>
-        <div style="font-size:20px;font-weight:700;margin-top:7px">BÁO CÁO TÀI CHÍNH CÁ NHÂN</div>
+      <header style="margin:0 -24px 13px;padding:16px 26px 15px;background:#064e3b;color:#ffffff">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px">
+          <div>
+            <div style="font-size:12px;font-weight:700;letter-spacing:2.4px;color:#a7f3d0">FINANCE TRACKER</div>
+            <div style="font-size:22px;font-weight:800;line-height:1.15;margin-top:5px">BÁO CÁO TÀI CHÍNH CÁ NHÂN</div>
+            <div style="font-size:11px;color:#d1fae5;margin-top:5px">Báo cáo quản trị · Dữ liệu giao dịch thực tế</div>
+          </div>
+          <div style="width:145px;box-sizing:border-box;border:1px solid #34d399;background:#065f46;padding:8px 10px;text-align:right;overflow:hidden">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#a7f3d0">Kỳ báo cáo</div>
+            <div style="font-size:15px;font-weight:800;margin-top:4px">${escapeHtml(metadata.period)}</div>
+            <div style="font-size:11px;color:#d1fae5;margin-top:3px">${escapeHtml(metadata.reportTypeLabel)}</div>
+          </div>
+        </div>
       </header>
-      <section style="display:grid;grid-template-columns:1fr 1fr;gap:8px 32px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:13px">
-        <div><strong>Người dùng:</strong> ${escapeHtml(metadata.userName)}</div>
-        <div><strong>Email:</strong> ${escapeHtml(metadata.email)}</div>
-        <div><strong>Loại báo cáo:</strong> ${escapeHtml(metadata.reportTypeLabel)}</div>
-        <div><strong>Thời gian:</strong> ${escapeHtml(metadata.period)}</div>
-        <div style="grid-column:1 / -1"><strong>Ngày xuất:</strong> ${escapeHtml(metadata.exportedAt)}</div>
+      <section style="display:flex;justify-content:space-between;gap:18px;margin-bottom:10px;padding:0 3px;font-size:10px;color:#64748b">
+        <div style="width:47%;overflow-wrap:anywhere"><span style="display:block;text-transform:uppercase;font-size:9px;letter-spacing:.8px;color:#94a3b8">Người dùng</span><strong style="display:block;color:#334155;margin-top:3px">${escapeHtml(metadata.userName)}</strong><span>${escapeHtml(metadata.email)}</span></div>
+        <div style="width:47%;text-align:right;overflow-wrap:anywhere"><span style="display:block;text-transform:uppercase;font-size:9px;letter-spacing:.8px;color:#94a3b8">Thời điểm xuất</span><strong style="display:block;color:#334155;margin-top:3px">${escapeHtml(metadata.exportedAt)}</strong><span>Tài liệu dành cho mục đích báo cáo</span></div>
       </section>
-      <section style="background:#ecfdf5;border:1px solid #a7f3d0;padding:14px 18px;margin-bottom:20px;font-size:15px;color:#065f46">
-        <strong>Tổng tiền tương ứng:</strong> ${data.totalAmount.toLocaleString('vi-VN')}đ
+      <section style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:11px">
+        ${summaryCards.map((card) => `
+          <div style="min-height:65px;box-sizing:border-box;border:1px solid #e2e8f0;border-top:3px solid ${card.color};background:#ffffff;padding:8px 11px 10px">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b">${escapeHtml(card.label)}</div>
+            <div style="font-size:${card.display && card.display.length > 18 ? '13px' : '17px'};font-weight:800;line-height:1.35;color:${card.color};margin-top:4px;white-space:normal;overflow:visible;overflow-wrap:anywhere">
+              ${card.display ? escapeHtml(card.display) : `${Number(card.value || 0).toLocaleString('vi-VN')}đ`}
+            </div>
+            ${card.subtext ? `<div style="font-size:9px;color:#64748b;margin-top:2px">${escapeHtml(card.subtext)}</div>` : ''}
+          </div>
+        `).join('')}
       </section>`;
 
     const chartSection = document.createElement('section');
-    chartSection.style.cssText = 'margin:18px 0 24px;text-align:center;page-break-inside:avoid;background:#ffffff;color:#1f2937;';
-    chartSection.innerHTML = '<h3 style="font-size:17px;text-align:left;margin:0 0 12px;color:#1f2937">BIỂU ĐỒ</h3>';
-    const chartSvg = reportContent.querySelector('svg.recharts-surface');
-    if (chartSvg && rows.length > 0) {
-      const svgClone = chartSvg.cloneNode(true);
-      svgClone.setAttribute('width', '360');
-      svgClone.setAttribute('height', '260');
-      svgClone.style.cssText = 'display:block;width:360px;height:260px;margin:0 auto;background:#ffffff;';
-      chartSection.appendChild(svgClone);
+    chartSection.style.cssText = 'box-sizing:border-box;width:712px;margin:0 0 10px;padding:11px 14px;border:1px solid #e2e8f0;background:#ffffff;color:#172033;overflow:visible;display:block;visibility:visible;opacity:1;';
+    chartSection.innerHTML = '<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#059669">Phân tích cơ cấu</div><h3 style="font-size:15px;text-align:left;margin:2px 0;color:#172033">Phân bổ theo danh mục</h3><p style="font-size:9px;text-align:left;margin:0 0 5px;color:#64748b">Tỷ trọng được tổng hợp theo dữ liệu của kỳ báo cáo</p>';
+    let exportChartRoot = null;
+    if (data.reportData.length > 0) {
+      const chartLayout = document.createElement('div');
+      chartLayout.style.cssText = 'display:flex;align-items:center;gap:12px;width:682px;min-height:220px;';
+      const chartMount = document.createElement('div');
+      chartMount.style.cssText = 'width:430px;height:220px;flex:0 0 430px;background:#ffffff;overflow:visible;display:block;visibility:visible;opacity:1;';
+      chartLayout.appendChild(chartMount);
+
+      const chartLegend = document.createElement('div');
+      chartLegend.style.cssText = 'box-sizing:border-box;width:240px;padding:5px 9px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-size:9px;overflow:hidden;';
+      data.reportData.forEach((item) => {
+        const legendItem = document.createElement('div');
+        legendItem.style.cssText = 'display:grid;grid-template-columns:9px 1fr auto;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #e2e8f0;';
+        const color = document.createElement('span');
+        color.style.cssText = `display:inline-block;width:9px;height:9px;border-radius:50%;background:${item.color};`;
+        const label = document.createElement('span');
+        label.innerHTML = `<strong style="display:block;font-size:10px">${escapeHtml(categoryTranslation[item.name] || item.name)}</strong><span style="display:block;color:#64748b;margin-top:2px">${item.value.toLocaleString('vi-VN')}đ</span>`;
+        const percentage = document.createElement('strong');
+        percentage.textContent = item.percentage;
+        percentage.style.cssText = 'color:#475569;background:#ffffff;border:1px solid #e2e8f0;padding:3px 5px;';
+        legendItem.append(color, label, percentage);
+        chartLegend.appendChild(legendItem);
+      });
+      chartLayout.appendChild(chartLegend);
+      chartSection.appendChild(chartLayout);
+
+      exportChartRoot = createRoot(chartMount);
+      exportChartRoot.render(
+        <PieChart width={430} height={220}>
+          <Pie
+            data={data.reportData}
+            cx={215}
+            cy={110}
+            innerRadius={58}
+            outerRadius={88}
+            paddingAngle={3}
+            dataKey="value"
+            stroke="#ffffff"
+            strokeWidth={2}
+            isAnimationActive={false}
+          >
+            {data.reportData.map((entry, index) => (
+              <Cell key={`pdf-cell-${entry.name}-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+        </PieChart>
+      );
     } else {
       const emptyMessage = document.createElement('div');
       emptyMessage.textContent = 'Không có dữ liệu trong kỳ này';
@@ -124,46 +214,59 @@ const Reports = () => {
     exportElement.appendChild(chartSection);
 
     const statistics = document.createElement('section');
-    statistics.style.cssText = 'margin-top:24px;page-break-inside:avoid;';
+    statistics.style.cssText = 'margin-top:0;padding:10px 14px;border:1px solid #e2e8f0;background:#ffffff;';
     statistics.innerHTML = `
-      <h3 style="font-size:17px;margin:0 0 12px">BẢNG THỐNG KÊ</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead><tr style="background:#059669;color:#fff">
-          <th style="padding:10px;border:1px solid #d1d5db;text-align:left">Danh mục/Loại</th>
-          <th style="padding:10px;border:1px solid #d1d5db;text-align:right">Số tiền</th>
-          <th style="padding:10px;border:1px solid #d1d5db;text-align:right">Tỷ lệ</th>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#059669">Chi tiết số liệu</div>
+      <h3 style="font-size:15px;margin:2px 0 7px">BẢNG THỐNG KÊ</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="background:#064e3b;color:#fff">
+          <th style="width:34px;padding:6px;text-align:center">STT</th>
+          <th style="padding:6px 8px;text-align:left">Danh mục / Loại</th>
+          <th style="width:150px;padding:6px 8px;text-align:right">Số tiền (VNĐ)</th>
+          <th style="width:78px;padding:6px 8px;text-align:right">Tỷ lệ</th>
         </tr></thead>
-        <tbody>${rows.length ? rows.map((row) => `<tr>
-          <td style="padding:9px;border:1px solid #d1d5db">${escapeHtml(row.name)}</td>
-          <td style="padding:9px;border:1px solid #d1d5db;text-align:right;font-weight:700">${row.value.toLocaleString('vi-VN')}đ</td>
-          <td style="padding:9px;border:1px solid #d1d5db;text-align:right">${row.percentage}</td>
-        </tr>`).join('') : '<tr><td colspan="3" style="padding:18px;border:1px solid #d1d5db;text-align:center;color:#64748b">Không có dữ liệu trong kỳ này</td></tr>'}</tbody>
+        <tbody>${rows.length ? rows.map((row, index) => `<tr style="background:${index % 2 ? '#f8fafc' : '#ffffff'};border-bottom:1px solid #e2e8f0">
+          <td style="padding:6px;text-align:center;color:#64748b">${index + 1}</td>
+          <td style="padding:6px 8px;font-weight:700;color:#334155">${escapeHtml(row.name)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:800;color:#172033">${row.value.toLocaleString('vi-VN')}đ</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;color:#059669">${escapeHtml(row.percentage)}</td>
+        </tr>`).join('') : '<tr><td colspan="4" style="padding:20px;text-align:center;color:#64748b">Không có dữ liệu trong kỳ này</td></tr>'}</tbody>
       </table>`;
     exportElement.appendChild(statistics);
 
+    const assessment = document.createElement('section');
+    assessment.style.cssText = 'margin-top:9px;padding:9px 12px;border-left:4px solid #10b981;background:#ecfdf5;';
+    assessment.innerHTML = `
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#047857">Đánh giá tổng quan</div>
+      <p style="margin:4px 0 0;font-size:10px;line-height:1.4;color:#334155">${escapeHtml(pdfSummary)}</p>
+    `;
+    exportElement.appendChild(assessment);
+
     const footer = document.createElement('footer');
-    footer.style.cssText = 'margin-top:28px;padding-top:14px;border-top:1px solid #d1d5db;text-align:center;color:#6b7280;font-size:11px;line-height:1.7;';
-    footer.innerHTML = 'Generated by Finance Tracker<br>© 2026 Finance Tracker';
+    footer.style.cssText = 'margin-top:9px;padding:7px 3px 0;border-top:1px solid #cbd5e1;display:flex;justify-content:space-between;gap:20px;align-items:flex-end;color:#64748b;font-size:8px;line-height:1.4;';
+    footer.innerHTML = '<div style="width:46%;overflow-wrap:anywhere"><strong style="display:block;color:#064e3b;font-size:10px">FINANCE TRACKER</strong>Generated by Finance Tracker · Báo cáo tài chính cá nhân</div><div style="width:46%;text-align:right;overflow-wrap:anywhere">Tài liệu được tạo tự động từ dữ liệu hệ thống<br>© 2026 Finance Tracker</div>';
     exportElement.appendChild(footer);
     exportHost.appendChild(exportElement);
     document.body.appendChild(exportHost);
 
     const options = {
-      margin: [10, 10, 10, 10],
+      margin: [4, 4, 4, 4],
       filename: `${t('reports_pdf_filename')}${reportType}_${selectedMonth}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] }
+      pagebreak: { mode: ['legacy'] }
     };
     try {
       if (document.fonts?.ready) await document.fonts.ready;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       await html2pdf().set(options).from(exportElement).save();
     } catch (exportError) {
       console.error('Lỗi xuất PDF Reports:', exportError);
       alert('Xuất PDF thất bại. Vui lòng thử lại.');
     } finally {
+      exportChartRoot?.unmount();
       exportHost.remove();
     }
   };

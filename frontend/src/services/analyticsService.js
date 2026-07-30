@@ -1,7 +1,7 @@
 import api from './api';
 
-export const getDashboardAnalytics = async (date) => {
-  const response = await api.get('/analytics/dashboard', { params: { date } });
+export const getDashboardAnalytics = async (date, comparison) => {
+  const response = await api.get('/analytics/dashboard', { params: { date, comparison } });
   return response.data;
 };
 

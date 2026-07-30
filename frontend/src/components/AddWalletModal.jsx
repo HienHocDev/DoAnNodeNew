@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Wallet, CreditCard, Banknote } from 'lucide-react';
 import { createWallet } from '../services/walletService';
 import { useTheme } from '../context/ThemeContext';
+import MoneyInput from './MoneyInput';
 
 const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
   const [name, setName] = useState('');
@@ -84,10 +85,9 @@ const AddWalletModal = ({ isOpen, onClose, onSuccess }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('wallets_balance_label')}</label>
             <div className="relative">
-              <input
-                type="number"
+              <MoneyInput
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
+                onValueChange={setBalance}
                 placeholder="0"
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none pr-8 text-right"
               />

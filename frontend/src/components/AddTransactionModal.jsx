@@ -4,10 +4,11 @@ import { X, Coffee, Car, ShoppingBag, Receipt, Gamepad2, MoreHorizontal, ArrowUp
 import { getWallets } from '../services/walletService';
 import { createTransaction } from '../services/transactionService';
 import { useTheme } from '../context/ThemeContext';
+import MoneyInput from './MoneyInput';
 
 const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   const [type, setType] = useState('expense'); // 'expense' or 'income'
-  const [amount, setAmount] = useState('');
+  const [amountRaw, setAmountRaw] = useState('');
   const [category, setCategory] = useState('food');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [walletId, setWalletId] = useState('');
@@ -16,6 +17,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   const [wallets, setWallets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [amountLimitError, setAmountLimitError] = useState('');
   const { t } = useTheme();
 
   const expenseCategories = [
@@ -38,11 +40,12 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
     if (isOpen) {
       // Reset form
       setType('expense');
-      setAmount('');
+      setAmountRaw('');
       setCategory('food');
       setDate(new Date().toISOString().split('T')[0]);
       setNote('');
       setError('');
+      setAmountLimitError('');
       
       // Fetch wallets
       const fetchWallets = async () => {
@@ -61,7 +64,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    if (!amount || !walletId) {
+    if (!amountRaw || !walletId) {
       setError(t('transactions_modal_err_validation'));
       return;
     }
@@ -70,7 +73,7 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
       setLoading(true);
       setError('');
       await createTransaction({
-        amount: Number(amount),
+        amount: Number(amountRaw),
         type,
         category,
         date,
@@ -127,15 +130,22 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('transactions_modal_amount')}</label>
             <div className="relative">
-              <input
-                type="number"
+              <MoneyInput
+                aria-label={t('transactions_modal_amount')}
                 placeholder="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={amountRaw}
+                onValueChange={(value) => {
+                  setAmountRaw(value);
+                  setAmountLimitError('');
+                }}
+                onLimitExceeded={(limit) => setAmountLimitError(
+                  limit ? `Số tiền tối đa ${limit} chữ số.` : ''
+                )}
                 className="w-full text-right text-3xl font-bold border-b-2 border-gray-200 focus:border-green-500 outline-none py-2 pr-8"
               />
               <span className="absolute right-0 bottom-3 text-gray-500 font-semibold">đ</span>
             </div>
+            {amountLimitError && <p className="mt-1 text-xs font-medium text-amber-600">{amountLimitError}</p>}
           </div>
 
           {/* Categories Grid */}

@@ -21,49 +21,206 @@ const totalsByType = (rows) => rows.reduce((result, item) => {
   return result;
 }, { totalIncome: 0, totalExpense: 0 });
 
+const createPeriod = (startDate, endDate, unit, label) => ({ startDate, endDate, unit, label });
+
+const getComparisonPeriods = (range, comparisonType) => {
+  const currentMonthStart = range.startDate;
+  const nextMonthStart = range.endDate;
+  if (comparisonType === 'none') {
+    return {
+      current: createPeriod(currentMonthStart, nextMonthStart, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year}`),
+      previous: null
+    };
+  }
+  if (comparisonType === 'previousMonth') {
+    const previousStart = new Date(Date.UTC(range.year, range.month - 2, 1));
+    return {
+      current: createPeriod(currentMonthStart, nextMonthStart, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year}`),
+      previous: createPeriod(previousStart, currentMonthStart, 'day', `Tháng ${String(previousStart.getUTCMonth() + 1).padStart(2, '0')}/${previousStart.getUTCFullYear()}`)
+    };
+  }
+  if (comparisonType === 'samePeriodLastYear') {
+    const previousStart = new Date(Date.UTC(range.year - 1, range.month - 1, 1));
+    const previousEnd = new Date(Date.UTC(range.year - 1, range.month, 1));
+    return {
+      current: createPeriod(currentMonthStart, nextMonthStart, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year}`),
+      previous: createPeriod(previousStart, previousEnd, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year - 1}`)
+    };
+  }
+  if (comparisonType === 'previousQuarter') {
+    const quarterStartMonth = Math.floor((range.month - 1) / 3) * 3;
+    const quarter = Math.floor(quarterStartMonth / 3) + 1;
+    const currentStart = new Date(Date.UTC(range.year, quarterStartMonth, 1));
+    const currentEnd = new Date(Date.UTC(range.year, quarterStartMonth + 3, 1));
+    const previousStart = new Date(Date.UTC(range.year, quarterStartMonth - 3, 1));
+    return {
+      current: createPeriod(currentStart, currentEnd, 'month', `Quý ${quarter}/${range.year}`),
+      previous: createPeriod(
+        previousStart,
+        currentStart,
+        'month',
+        `Quý ${Math.floor(previousStart.getUTCMonth() / 3) + 1}/${previousStart.getUTCFullYear()}`
+      )
+    };
+  }
+
+  const currentStart = new Date(Date.UTC(range.year, 0, 1));
+  const currentEnd = new Date(Date.UTC(range.year + 1, 0, 1));
+  const previousStart = new Date(Date.UTC(range.year - 1, 0, 1));
+  return {
+    current: createPeriod(currentStart, currentEnd, 'month', `Năm ${range.year}`),
+    previous: createPeriod(previousStart, currentStart, 'month', `Năm ${range.year - 1}`)
+  };
+};
+
+const periodMatch = (user, period) => ({
+  user,
+  date: { $gte: period.startDate, $lt: period.endDate }
+});
+
+const getBucketExpression = (unit) => unit === 'day'
+  ? { $dayOfMonth: '$date' }
+  : { $month: '$date' };
+
+const getPeriodBucketCount = (period) => period.unit === 'day'
+  ? new Date(Date.UTC(period.startDate.getUTCFullYear(), period.startDate.getUTCMonth() + 1, 0)).getUTCDate()
+  : Math.round((period.endDate.getUTCFullYear() - period.startDate.getUTCFullYear()) * 12
+    + period.endDate.getUTCMonth() - period.startDate.getUTCMonth());
+
+const getPeriodAnalytics = async (user, period) => {
+  if (!period) return { totals: [], categories: [], buckets: [] };
+  const match = periodMatch(user, period);
+  const [totals, categories, buckets] = await Promise.all([
+    Transaction.aggregate([
+      { $match: match },
+      { $group: { _id: '$type', total: { $sum: '$amount' } } }
+    ]),
+    Transaction.aggregate([
+      { $match: { ...match, type: 'expense' } },
+      { $group: { _id: '$category', value: { $sum: '$amount' } } },
+      { $sort: { value: -1 } }
+    ]),
+    Transaction.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { bucket: getBucketExpression(period.unit), type: '$type' },
+          total: { $sum: '$amount' }
+        }
+      }
+    ])
+  ]);
+  return { totals, categories, buckets };
+};
+
+const buildTrend = (period, rows) => {
+  const bucketMap = new Map(rows.map((item) => [`${item._id.bucket}-${item._id.type}`, item.total]));
+  const count = getPeriodBucketCount(period);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(
+      period.startDate.getUTCFullYear(),
+      period.startDate.getUTCMonth() + (period.unit === 'month' ? index : 0),
+      period.unit === 'day' ? index + 1 : 1
+    ));
+    const bucket = period.unit === 'day' ? index + 1 : date.getUTCMonth() + 1;
+    return {
+      name: period.unit === 'day'
+        ? String(index + 1).padStart(2, '0')
+        : `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`,
+      income: bucketMap.get(`${bucket}-income`) || 0,
+      expense: bucketMap.get(`${bucket}-expense`) || 0
+    };
+  });
+};
+
 const getDashboardAnalytics = async (req, res) => {
   try {
     const range = parseMonthRange(req.query.date);
     if (!range) return res.status(400).json({ message: 'Tháng phải có định dạng YYYY-MM' });
-    const user = new mongoose.Types.ObjectId(req.user.id || req.user._id);
-    const currentMatch = { user, date: { $gte: range.startDate, $lt: range.endDate } };
-    const previousMatch = { user, date: { $gte: range.previousStartDate, $lt: range.startDate } };
+    const comparisonType = req.query.comparison || 'previousMonth';
+    const validComparisons = ['none', 'previousMonth', 'samePeriodLastYear', 'previousQuarter', 'previousYear'];
+    if (!validComparisons.includes(comparisonType)) {
+      return res.status(400).json({ message: 'Loại so sánh không hợp lệ' });
+    }
 
-    const [currentRows, previousRows, categoryData, dailyRows] = await Promise.all([
-      Transaction.aggregate([{ $match: currentMatch }, { $group: { _id: '$type', total: { $sum: '$amount' } } }]),
-      Transaction.aggregate([{ $match: previousMatch }, { $group: { _id: '$type', total: { $sum: '$amount' } } }]),
-      Transaction.aggregate([
-        { $match: { ...currentMatch, type: 'expense' } },
-        { $group: { _id: '$category', value: { $sum: '$amount' } } },
-        { $project: { name: '$_id', value: 1, _id: 0 } }, { $sort: { value: -1 } }
-      ]),
-      Transaction.aggregate([
-        { $match: currentMatch },
-        { $group: { _id: { day: { $dayOfMonth: '$date' }, type: '$type' }, total: { $sum: '$amount' } } }
-      ])
+    const user = new mongoose.Types.ObjectId(req.user.id || req.user._id);
+    const periods = getComparisonPeriods(range, comparisonType);
+    const [currentAnalytics, previousAnalytics] = await Promise.all([
+      getPeriodAnalytics(user, periods.current),
+      getPeriodAnalytics(user, periods.previous)
     ]);
-    const current = totalsByType(currentRows);
-    const previous = totalsByType(previousRows);
-    const dailyMap = new Map(dailyRows.map(item => [`${item._id.day}-${item._id.type}`, item.total]));
-    const days = new Date(Date.UTC(range.year, range.month, 0)).getUTCDate();
-    const trendData = Array.from({ length: days }, (_, index) => {
-      const day = index + 1;
+    const current = totalsByType(currentAnalytics.totals);
+    const previous = totalsByType(previousAnalytics.totals);
+    const currentBalance = current.totalIncome - current.totalExpense;
+    const previousBalance = previous.totalIncome - previous.totalExpense;
+    const currentTrend = buildTrend(periods.current, currentAnalytics.buckets);
+    const previousTrend = periods.previous ? buildTrend(periods.previous, previousAnalytics.buckets) : [];
+    const comparisonTrendData = currentTrend.map((item, index) => ({
+      name: item.name,
+      currentIncome: item.income,
+      previousIncome: previousTrend[index]?.income || 0,
+      currentExpense: item.expense,
+      previousExpense: previousTrend[index]?.expense || 0
+    }));
+
+    const previousCategoryMap = new Map(previousAnalytics.categories.map((item) => [item._id, item.value]));
+    const currentCategoryMap = new Map(currentAnalytics.categories.map((item) => [item._id, item.value]));
+    const categoryNames = new Set([...currentCategoryMap.keys(), ...previousCategoryMap.keys()]);
+    const categoryComparison = Array.from(categoryNames).map((name) => {
+      const currentValue = currentCategoryMap.get(name) || 0;
+      const previousValue = previousCategoryMap.get(name) || 0;
       return {
-        name: `${String(day).padStart(2, '0')}/${String(range.month).padStart(2, '0')}`,
-        income: dailyMap.get(`${day}-income`) || 0,
-        expense: dailyMap.get(`${day}-expense`) || 0
+        name,
+        currentValue,
+        previousValue,
+        change: currentValue - previousValue,
+        changePercent: percentageChange(currentValue, previousValue)
       };
-    });
+    }).sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+
+    const comparison = {
+      currentIncome: current.totalIncome,
+      previousIncome: previous.totalIncome,
+      incomeChange: current.totalIncome - previous.totalIncome,
+      incomeChangePercent: percentageChange(current.totalIncome, previous.totalIncome),
+      currentExpense: current.totalExpense,
+      previousExpense: previous.totalExpense,
+      expenseChange: current.totalExpense - previous.totalExpense,
+      expenseChangePercent: percentageChange(current.totalExpense, previous.totalExpense),
+      currentBalance,
+      previousBalance,
+      balanceChange: currentBalance - previousBalance,
+      balanceChangePercent: percentageChange(currentBalance, previousBalance),
+      comparisonType
+    };
 
     return res.json({
       month: range.value,
+      comparisonType,
+      currentPeriod: {
+        label: periods.current.label,
+        income: current.totalIncome,
+        expense: current.totalExpense,
+        balance: currentBalance
+      },
+      previousPeriod: periods.previous ? {
+        label: periods.previous.label,
+        income: previous.totalIncome,
+        expense: previous.totalExpense,
+        balance: previousBalance
+      } : null,
+      comparison,
       summary: {
         ...current,
-        balance: current.totalIncome - current.totalExpense,
-        incomeChange: percentageChange(current.totalIncome, previous.totalIncome),
-        expenseChange: percentageChange(current.totalExpense, previous.totalExpense)
+        balance: currentBalance,
+        incomeChange: comparison.incomeChangePercent,
+        expenseChange: comparison.expenseChangePercent,
+        balanceChange: comparison.balanceChangePercent
       },
-      categoryData, trendData
+      categoryData: currentAnalytics.categories.map((item) => ({ name: item._id, value: item.value })),
+      categoryComparison,
+      trendData: currentTrend,
+      comparisonTrendData
     });
   } catch (err) {
     console.error(err);

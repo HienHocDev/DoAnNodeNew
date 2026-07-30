@@ -1,8 +1,8 @@
 import api from './api';
 
 // ĐÃ SỬA: Xóa bỏ chữ /api ở đầu vì file cấu hình chung của dự án đã tự chèn rồi
-export const getBudgets = async () => {
-  const response = await api.get('/budgets');
+export const getBudgets = async (month) => {
+  const response = await api.get('/budgets', { params: { month } });
   return response.data;
 };
 
@@ -13,5 +13,10 @@ export const createBudget = async (budgetData) => {
 
 export const deleteBudget = async (id) => {
   const response = await api.delete(`/budgets/${id}`);
+  return response.data;
+};
+
+export const updateBudget = async (id, budgetData) => {
+  const response = await api.patch(`/budgets/${id}`, budgetData);
   return response.data;
 };

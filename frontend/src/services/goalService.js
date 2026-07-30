@@ -10,8 +10,13 @@ export const createGoal = async (goalData) => {
   return response.data;
 };
 
-export const updateGoalAmount = async (id, currentAmount) => {
-  const response = await api.put(`/goals/${id}`, { currentAmount });
+export const updateGoalAmount = async (id, amountToAdd, note = '') => {
+  const response = await api.put(`/goals/${id}`, { amountToAdd, note });
+  return response.data;
+};
+
+export const updateGoal = async (id, goalData) => {
+  const response = await api.patch(`/goals/${id}`, goalData);
   return response.data;
 };
 
