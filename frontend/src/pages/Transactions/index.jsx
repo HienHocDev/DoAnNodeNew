@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Coffee, ShoppingBag, Receipt, Car, ArrowDownCircle, ArrowUpCircle, Gamepad2, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Plus, Coffee, ShoppingBag, Receipt, Car, ArrowUpCircle, Gamepad2, MoreHorizontal } from 'lucide-react';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import { getTransactions } from '../../services/transactionService';
 import { useTheme } from '../../context/ThemeContext';
@@ -22,28 +22,61 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedType, setSelectedType] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [searchTerm, setSearchTerm] = useState('');
+  const latestRequestId = useRef(0);
   const { t } = useTheme();
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    const requestId = latestRequestId.current + 1;
+    latestRequestId.current = requestId;
     try {
       setLoading(true);
-      const data = await getTransactions();
-      setTransactions(data);
-      setError(null);
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const data = await getTransactions({ type: selectedType, month, year });
+      if (requestId === latestRequestId.current) {
+        setTransactions(data);
+        setError(null);
+      }
     } catch (err) {
-      setError(t('transactions_error_api'));
+      if (requestId === latestRequestId.current) {
+        setError(t('transactions_error_api'));
+      }
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [selectedMonth, selectedType, t]);
 
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [fetchTransactions]);
 
   const handleTransactionAdded = () => {
     fetchTransactions();
   };
+
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase('vi-VN');
+  const filteredTransactions = transactions.filter((transaction) => {
+    const transactionDate = new Date(transaction.date);
+    const transactionMonth = `${transactionDate.getUTCFullYear()}-${String(transactionDate.getUTCMonth() + 1).padStart(2, '0')}`;
+    const matchesMonth = transactionMonth === selectedMonth;
+    const matchesType = selectedType === 'all' || transaction.type === selectedType;
+    if (!matchesMonth || !matchesType) return false;
+    if (!normalizedSearch) return true;
+    const categoryName = getCategoryDetails(transaction.category, t).name;
+    return [transaction.note, transaction.category, categoryName, transaction.wallet?.name]
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase('vi-VN').includes(normalizedSearch));
+  });
+
+  const tabClassName = (type) => `flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm transition-all ${
+    selectedType === type
+      ? 'bg-white shadow-sm font-bold text-gray-800'
+      : 'font-semibold text-gray-500 hover:text-gray-800'
+  }`;
 
   return (
     <>
@@ -51,14 +84,16 @@ const Transactions = () => {
         {/* Header & Toolbar */}
         <div className="p-6 border-b border-gray-100/60 flex flex-col md:flex-row items-center justify-between gap-4 bg-white/50">
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-            <select className="border border-gray-200/80 bg-white/50 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all w-full sm:w-auto cursor-pointer shadow-sm">
-              <option>Tháng 06/2025</option>
-              <option>Tháng 05/2025</option>
-            </select>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              className="border border-gray-200/80 bg-white/50 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all w-full sm:w-auto cursor-pointer shadow-sm"
+            />
             <div className="flex bg-gray-100/80 p-1.5 rounded-xl shadow-inner w-full sm:w-auto">
-              <button className="flex-1 sm:flex-none px-5 py-2 bg-white shadow-sm rounded-lg text-sm font-bold text-gray-800 transition-all">{t('transactions_all')}</button>
-              <button className="flex-1 sm:flex-none px-5 py-2 text-sm font-semibold text-gray-500 hover:text-gray-800 transition-all">{t('transactions_income')}</button>
-              <button className="flex-1 sm:flex-none px-5 py-2 text-sm font-semibold text-gray-500 hover:text-gray-800 transition-all">{t('transactions_expense')}</button>
+              <button onClick={() => setSelectedType('all')} className={tabClassName('all')}>{t('transactions_all')}</button>
+              <button onClick={() => setSelectedType('income')} className={tabClassName('income')}>{t('transactions_income')}</button>
+              <button onClick={() => setSelectedType('expense')} className={tabClassName('expense')}>{t('transactions_expense')}</button>
             </div>
           </div>
 
@@ -67,6 +102,8 @@ const Transactions = () => {
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input 
                 type="text" 
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder={t('transactions_search')} 
                 className="pl-10 pr-4 py-2.5 bg-gray-50/50 border border-gray-200/80 rounded-xl text-sm w-full md:w-64 outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white transition-all shadow-sm font-medium"
               />
@@ -89,7 +126,7 @@ const Transactions = () => {
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-64 text-rose-500 font-medium">{error}</div>
-          ) : transactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Receipt className="w-12 h-12 mb-3 text-gray-300" />
               <span className="font-medium">{t('transactions_no_data')}</span>
@@ -107,7 +144,7 @@ const Transactions = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50/50">
-                {transactions.map((tx) => {
+                {filteredTransactions.map((tx) => {
                   const catDetails = getCategoryDetails(tx.category, t);
                   const IconComponent = catDetails.icon;
                   const dateObj = new Date(tx.date);

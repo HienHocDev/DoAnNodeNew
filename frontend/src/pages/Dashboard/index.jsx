@@ -1,211 +1,283 @@
-import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer,
+  Tooltip as RechartsTooltip, XAxis, YAxis
+} from 'recharts';
+import {
+  ArrowDownCircle, ArrowUpCircle, MinusCircle, Sparkles, TrendingDown,
+  TrendingUp, Wallet
+} from 'lucide-react';
 import { getDashboardAnalytics } from '../../services/analyticsService';
 import { useTheme } from '../../context/ThemeContext';
+
+const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#f43f5e', '#64748b'];
+
+const comparisonLabels = {
+  none: 'Không so sánh',
+  previousMonth: 'Tháng trước',
+  samePeriodLastYear: 'Cùng kỳ năm trước',
+  previousQuarter: 'Quý trước',
+  previousYear: 'Năm trước'
+};
+
+const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatPercent = (value) => value === null
+  ? 'Mới'
+  : `${value > 0 ? '+' : ''}${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value || 0)}%`;
+
+const getChangeTone = (value, inverse = false) => {
+  if (value === null || value === 0) return 'neutral';
+  const positive = inverse ? value < 0 : value > 0;
+  return positive ? 'positive' : 'negative';
+};
+
+const ChangeBadge = ({ value, inverse = false }) => {
+  const tone = getChangeTone(value, inverse);
+  const Icon = value === null || value > 0 ? ArrowUpCircle : value < 0 ? ArrowDownCircle : MinusCircle;
+  const classes = tone === 'positive'
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-600'
+    : tone === 'negative'
+      ? 'border-rose-100 bg-rose-50 text-rose-600'
+      : 'border-gray-200 bg-gray-50 text-gray-500';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-bold ${classes}`}>
+      <Icon className="h-3.5 w-3.5" /> {formatPercent(value)}
+    </span>
+  );
+};
+
+const SummaryCard = ({ label, value, change, comparisonLabel, inverse = false, dark = false }) => (
+  <div className={`relative overflow-hidden rounded-3xl border p-5 shadow-sm ${dark ? 'border-primary-500/50 bg-gradient-to-br from-primary-600 to-primary-800 text-white' : 'border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900'}`}>
+    <div className="relative z-10">
+      <p className={`text-xs font-bold uppercase tracking-wider ${dark ? 'text-primary-100' : 'text-gray-500 dark:text-gray-400'}`}>{label}</p>
+      <h3 className="mt-2 text-2xl font-extrabold tracking-tight md:text-3xl">{formatMoney(value)}</h3>
+      {comparisonLabel && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <ChangeBadge value={change} inverse={inverse} />
+          <span className={`text-xs font-medium ${dark ? 'text-primary-100' : 'text-gray-400'}`}>So với {comparisonLabel.toLowerCase()}</span>
+        </div>
+      )}
+    </div>
+    <Wallet className={`absolute -bottom-2 -right-2 h-20 w-20 ${dark ? 'text-white/10' : 'text-gray-100 dark:text-gray-800'}`} />
+  </div>
+);
 
 const Dashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [comparisonType, setComparisonType] = useState('none');
   const { t } = useTheme();
 
   useEffect(() => {
+    let active = true;
     const fetchAnalytics = async () => {
       try {
-        const res = await getDashboardAnalytics();
-        setAnalyticsData(res);
-      } catch (err) {
-        setError(t('dashboard_error_api'));
+        setLoading(true);
+        setError('');
+        const response = await getDashboardAnalytics(selectedMonth, comparisonType);
+        if (active) setAnalyticsData(response);
+      } catch (requestError) {
+        if (active) setError(requestError.response?.data?.message || t('dashboard_error_api'));
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     fetchAnalytics();
-  }, []);
+    return () => { active = false; };
+  }, [selectedMonth, comparisonType, t]);
 
-  if (loading) return <div className="text-center py-10 text-gray-500">{t('dashboard_loading')}</div>;
-  if (error) return <div className="text-red-500 text-center py-10">{error}</div>;
+  const pieData = useMemo(() => (analyticsData?.categoryData || []).map((item, index) => ({
+    ...item,
+    color: COLORS[index % COLORS.length]
+  })), [analyticsData]);
 
-  // Mảng màu sắc dự phòng để tự động gán nếu không tìm thấy key trùng khớp
-  const PREDEFINED_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#ff6b6b', '#06b6d4', '#f43f5e'];
+  const insights = useMemo(() => {
+    if (!analyticsData?.previousPeriod) return ['Chọn một kỳ so sánh để xem nhận xét xu hướng tài chính.'];
+    const { comparison, categoryComparison } = analyticsData;
+    const messages = [
+      comparison.incomeChangePercent === null
+        ? 'Kỳ hiện tại bắt đầu phát sinh thu nhập mới.'
+        : `Thu nhập ${comparison.incomeChangePercent >= 0 ? 'tăng' : 'giảm'} ${formatPercent(Math.abs(comparison.incomeChangePercent)).replace('+', '')} so với kỳ đối chiếu.`,
+      comparison.expenseChangePercent === null
+        ? 'Kỳ hiện tại bắt đầu phát sinh chi tiêu mới.'
+        : `Chi tiêu ${comparison.expenseChangePercent >= 0 ? 'tăng' : 'giảm'} ${formatPercent(Math.abs(comparison.expenseChangePercent)).replace('+', '')}.`
+    ];
+    const measurable = categoryComparison.filter((item) => item.changePercent !== null && item.change !== 0);
+    const strongestIncrease = [...measurable].filter((item) => item.change > 0).sort((a, b) => b.changePercent - a.changePercent)[0];
+    const strongestDecrease = [...measurable].filter((item) => item.change < 0).sort((a, b) => a.changePercent - b.changePercent)[0];
+    if (strongestIncrease) messages.push(`Danh mục tăng mạnh nhất là ${strongestIncrease.name} (${formatPercent(strongestIncrease.changePercent)}).`);
+    if (strongestDecrease) messages.push(`Danh mục giảm mạnh nhất là ${strongestDecrease.name} (${formatPercent(strongestDecrease.changePercent)}).`);
+    messages.push(comparison.balanceChange > 0
+      ? 'Số dư đang cải thiện; nếu xu hướng tiếp tục, khả năng tích lũy sẽ tăng.'
+      : comparison.balanceChange < 0
+        ? 'Số dư giảm; nên rà soát các danh mục chi tiêu tăng mạnh.'
+        : 'Số dư chưa thay đổi so với kỳ đối chiếu.');
+    return messages;
+  }, [analyticsData]);
 
-  // Bảng mapping linh hoạt hỗ trợ cả tiếng Anh lẫn tiếng Việt
-  const colorMapping = {
-    // Tiếng Anh (Dữ liệu thực tế của bạn)
-    'food': '#3b82f6',
-    'transport': '#8b5cf6',
-    'shopping': '#f59e0b',
-    'bills': '#10b981',
-    'entertainment': '#ec4899',
-    'other': '#6b7280',
-    
-    // Tiếng Việt phòng hờ
-    'Ăn uống': '#3b82f6',
-    'Di chuyển': '#8b5cf6',
-    'Mua sắm': '#f59e0b',
-    'Hóa đơn': '#10b981',
-    'Giải trí': '#ec4899',
-    'Khác': '#6b7280'
-  };
+  if (loading && !analyticsData) return <div className="py-10 text-center text-gray-500">{t('dashboard_loading')}</div>;
+  if (error && !analyticsData) return <div className="py-10 text-center text-red-500">{error}</div>;
 
-  // Đổ dữ liệu thật từ API vào pieData kèm xử lý màu thông minh
-  const pieData = analyticsData.categoryData.map((item, index) => {
-    // Tìm màu theo tên danh mục (chuyển về viết thường để so khớp chính xác nhất)
-    const normalizedName = item.name ? item.name.toLowerCase().trim() : '';
-    let assignedColor = colorMapping[item.name] || colorMapping[normalizedName];
-
-    // Nếu là danh mục mới hoàn toàn không có trong danh sách, tự gán tuần hoàn theo mảng màu
-    if (!assignedColor) {
-      assignedColor = PREDEFINED_COLORS[index % PREDEFINED_COLORS.length];
-    }
-
-    return {
-      name: item.name,
-      value: item.value,
-      color: assignedColor
-    };
-  });
-
-  // Đổ dữ liệu thật từ API vào lineData
-  const lineData = analyticsData.trendData.map(item => ({
-    date: item.name,
-    income: item['Thu nhập'],
-    expense: item['Chi tiêu']
-  }));
-
-  const { summary } = analyticsData;
+  const { summary, comparison, currentPeriod, previousPeriod, categoryComparison = [] } = analyticsData;
+  const comparisonLabel = previousPeriod?.label;
+  const chartData = previousPeriod ? analyticsData.comparisonTrendData : analyticsData.trendData;
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Cards Thống kê */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Income Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary-500/10 dark:bg-primary-500/5 rounded-full blur-2xl"></div>
-          <div className="relative z-10">
-            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_income')}</p>
-            <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalIncome.toLocaleString('vi-VN')}đ</h3>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold rounded-lg mt-3 border border-green-100 dark:border-green-500/20">
-              <ArrowUpCircle className="w-4 h-4" /> 
-              <span>+12.5%</span>
-            </div>
-          </div>
-          <div className="w-14 h-14 bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-500/20 dark:to-primary-500/10 rounded-2xl flex items-center justify-center text-primary-600 dark:text-primary-400 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 relative z-10">
-            <Wallet className="w-7 h-7" />
-          </div>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center dark:border-gray-800 dark:bg-gray-900">
+        <div>
+          <h2 className="font-extrabold text-gray-900 dark:text-white">Phân tích tài chính</h2>
+          <p className="mt-0.5 text-xs text-gray-500">Dữ liệu từ giao dịch thực tế · {currentPeriod.label}</p>
         </div>
-
-        {/* Total Expense Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-rose-500/10 dark:bg-rose-500/5 rounded-full blur-2xl"></div>
-          <div className="relative z-10">
-            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 tracking-wide uppercase">{t('dashboard_total_expense')}</p>
-            <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{summary.totalExpense.toLocaleString('vi-VN')}đ</h3>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg mt-3 border border-rose-100 dark:border-rose-500/20">
-              <ArrowDownCircle className="w-4 h-4" /> 
-              <span>-8.3%</span>
-            </div>
-          </div>
-          <div className="w-14 h-14 bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-500/20 dark:to-rose-500/10 rounded-2xl flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 relative z-10">
-            <Wallet className="w-7 h-7" />
-          </div>
-        </div>
-
-        {/* Current Balance Card */}
-        <div className="bg-gradient-to-br from-primary-600 to-primary-800 p-6 rounded-[24px] shadow-lg shadow-primary-500/30 transition-all duration-300 hover:-translate-y-1 flex items-center justify-between group relative overflow-hidden text-white border border-primary-500/50">
-          <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute -left-4 -top-4 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
-          <div className="relative z-10">
-            <p className="text-sm font-bold text-primary-100 mb-2 tracking-wide uppercase">{t('dashboard_current_balance')}</p>
-            <h3 className="text-3xl font-extrabold tracking-tight">
-              {summary.balance.toLocaleString('vi-VN')}đ
-            </h3>
-            <p className="text-sm text-primary-200 font-medium mt-3 flex items-center gap-1.5">
-               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-               Updated today
-            </p>
-          </div>
-          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300 relative z-10 border border-white/20">
-            <Wallet className="w-7 h-7" />
-          </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
+            <span className="whitespace-nowrap">So sánh với:</span>
+            <select value={comparisonType} onChange={(event) => setComparisonType(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900">
+              {Object.entries(comparisonLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
         </div>
       </div>
 
-      {/* Biểu đồ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Biểu đồ tròn */}
-        <div className="bg-white dark:bg-gray-900 p-7 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">{t('dashboard_expense_by_category')}</h3>
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="h-64 flex-1 w-full">
-              {pieData.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-sm text-gray-400 font-medium bg-gray-50 dark:bg-gray-800/50 rounded-2xl">{t('dashboard_no_expense_data')}</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={85}
-                      paddingAngle={6}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value) => `${value.toLocaleString('vi-VN')}đ`} 
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: '600', backgroundColor: 'var(--tw-colors-gray-900)', color: 'white' }}
-                      itemStyle={{ color: 'white' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <div className="w-full md:w-56 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-              <ul className="space-y-4">
-                {pieData.map((item, index) => (
-                  <li key={index} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-3">
-                      <span className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium max-w-[100px] truncate capitalize">{item.name}</span>
-                    </span>
-                    <span className="font-bold text-gray-900 dark:text-white">{item.value.toLocaleString('vi-VN')}đ</span>
-                  </li>
-                ))}
-              </ul>
+      {error && <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-medium text-rose-600">{error}</div>}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <SummaryCard label={t('dashboard_total_income')} value={summary.totalIncome} change={comparison.incomeChangePercent} comparisonLabel={comparisonLabel} />
+        <SummaryCard label={t('dashboard_total_expense')} value={summary.totalExpense} change={comparison.expenseChangePercent} comparisonLabel={comparisonLabel} inverse />
+        <SummaryCard label={t('dashboard_current_balance')} value={summary.balance} change={comparison.balanceChangePercent} comparisonLabel={comparisonLabel} dark />
+      </div>
+
+      {previousPeriod && (
+        <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-800 dark:text-white">So sánh kỳ</h3>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_1.2fr]">
+            <PeriodBlock title="Kỳ hiện tại" period={currentPeriod} />
+            <PeriodBlock title="Kỳ so sánh" period={previousPeriod} />
+            <div className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800/60">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Kết luận</p>
+              <Conclusion label="Thu nhập" change={comparison.incomeChange} goodWhenPositive />
+              <Conclusion label="Chi tiêu" change={comparison.expenseChange} />
+              <Conclusion label="Số dư" change={comparison.balanceChange} goodWhenPositive />
             </div>
           </div>
-        </div>
+        </section>
+      )}
 
-        {/* Biểu đồ đường */}
-        <div className="bg-white dark:bg-gray-900 p-7 rounded-[24px] shadow-sm border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-soft">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">{t('dashboard_income_vs_expense')}</h3>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">{t('dashboard_expense_by_category')}</h3>
+          <div className="flex flex-col items-center gap-4 md:flex-row">
+            <div className="h-56 w-full flex-1">
+              {pieData.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} innerRadius={55} outerRadius={78} paddingAngle={4} dataKey="value" stroke="none">
+                      {pieData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                    </Pie>
+                    <RechartsTooltip formatter={(value) => formatMoney(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : <EmptyState text={t('dashboard_no_expense_data')} />}
+            </div>
+            <ul className="w-full space-y-2 rounded-2xl bg-gray-50 p-4 text-sm md:w-52 dark:bg-gray-800/60">
+              {pieData.map((item) => (
+                <li key={item.name} className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} /><span className="truncate capitalize">{item.name}</span></span>
+                  <strong>{formatMoney(item.value)}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h3 className="mb-1 text-lg font-bold text-gray-900 dark:text-white">{previousPeriod ? 'Chi tiêu theo kỳ' : t('dashboard_income_vs_expense')}</h3>
+          <p className="mb-3 text-xs text-gray-400">{previousPeriod ? `${currentPeriod.label} và ${previousPeriod.label}` : currentPeriod.label}</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" strokeOpacity={0.5} />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 13, fontWeight: 500}} tickFormatter={(value) => value >= 1000000 ? `${value/1000000}M` : value} dx={-10} />
-                <RechartsTooltip 
-                  formatter={(value) => `${value.toLocaleString('vi-VN')}đ`}
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: '600', backgroundColor: 'var(--tw-colors-gray-900)', color: 'white' }}
-                  itemStyle={{ color: 'white' }}
-                />
-                <Line type="monotone" dataKey="income" name={t('dashboard_income')} stroke="#10b981" strokeWidth={4} dot={{r: 0}} activeDot={{r: 8, strokeWidth: 0, fill: '#10b981'}} />
-                <Line type="monotone" dataKey="expense" name={t('dashboard_expense')} stroke="#f43f5e" strokeWidth={4} dot={{r: 0}} activeDot={{r: 8, strokeWidth: 0, fill: '#f43f5e'}} />
+              <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value)} />
+                <RechartsTooltip formatter={(value) => formatMoney(value)} />
+                {previousPeriod ? (
+                  <>
+                    <Line type="monotone" dataKey="currentExpense" name={currentPeriod.label} stroke="#10b981" strokeWidth={3} dot={false} />
+                    <Line type="monotone" dataKey="previousExpense" name={previousPeriod.label} stroke="#9ca3af" strokeWidth={2.5} strokeDasharray="6 4" dot={false} />
+                  </>
+                ) : (
+                  <>
+                    <Line type="monotone" dataKey="income" name={t('dashboard_income')} stroke="#10b981" strokeWidth={3} dot={false} />
+                    <Line type="monotone" dataKey="expense" name={t('dashboard_expense')} stroke="#f43f5e" strokeWidth={3} dot={false} />
+                  </>
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </section>
       </div>
+
+      {previousPeriod && (
+        <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Phân tích danh mục chi tiêu</h3>
+          {categoryComparison.length ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[650px] text-left text-sm">
+                <thead className="border-b border-gray-100 text-xs uppercase text-gray-400">
+                  <tr><th className="py-3">Danh mục</th><th className="py-3 text-right">{previousPeriod.label}</th><th className="py-3 text-right">{currentPeriod.label}</th><th className="py-3 text-right">Thay đổi</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {categoryComparison.map((item) => (
+                    <tr key={item.name}>
+                      <td className="py-3 font-bold capitalize text-gray-700 dark:text-gray-200">{item.name}</td>
+                      <td className="py-3 text-right">{formatMoney(item.previousValue)}</td>
+                      <td className="py-3 text-right">{formatMoney(item.currentValue)}</td>
+                      <td className="py-3 text-right"><ChangeBadge value={item.changePercent} inverse /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <EmptyState text="Chưa có chi tiêu ở hai kỳ để so sánh." />}
+        </section>
+      )}
+
+      <section className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm dark:border-indigo-900/40 dark:from-indigo-950/30 dark:to-gray-900">
+        <div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-indigo-600" /><h3 className="font-extrabold text-gray-900 dark:text-white">AI Financial Summary</h3></div>
+        <ul className="mt-3 grid gap-2 text-sm text-gray-600 md:grid-cols-2 dark:text-gray-300">
+          {insights.map((message) => <li key={message} className="rounded-xl bg-white/80 p-3 shadow-sm dark:bg-gray-800/70">{message}</li>)}
+        </ul>
+      </section>
     </div>
   );
 };
+
+const PeriodBlock = ({ title, period }) => (
+  <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-700">
+    <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{title}</p>
+    <h4 className="mt-1 font-extrabold text-gray-800 dark:text-white">{period.label}</h4>
+    <div className="mt-3 space-y-2 text-sm">
+      <div className="flex justify-between"><span className="text-gray-500">Thu</span><strong className="text-emerald-600">{formatMoney(period.income)}</strong></div>
+      <div className="flex justify-between"><span className="text-gray-500">Chi</span><strong className="text-rose-600">{formatMoney(period.expense)}</strong></div>
+      <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Số dư</span><strong>{formatMoney(period.balance)}</strong></div>
+    </div>
+  </div>
+);
+
+const Conclusion = ({ label, change, goodWhenPositive = false }) => {
+  const good = goodWhenPositive ? change >= 0 : change <= 0;
+  const Icon = change > 0 ? TrendingUp : change < 0 ? TrendingDown : MinusCircle;
+  const direction = change > 0 ? 'tăng' : change < 0 ? 'giảm' : 'không đổi';
+  return (
+    <div className={`mt-2 flex items-center gap-2 text-sm font-semibold ${change === 0 ? 'text-gray-500' : good ? 'text-emerald-600' : 'text-rose-600'}`}>
+      <Icon className="h-4 w-4" /> {label} {direction} {change !== 0 && formatMoney(Math.abs(change))}
+    </div>
+  );
+};
+
+const EmptyState = ({ text }) => <div className="flex h-full min-h-28 items-center justify-center rounded-2xl bg-gray-50 px-4 text-center text-sm font-medium text-gray-400 dark:bg-gray-800/60">{text}</div>;
 
 export default Dashboard;

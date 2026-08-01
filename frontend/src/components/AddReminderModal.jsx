@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { createReminder } from '../services/reminderService';
 import { useTheme } from '../context/ThemeContext';
+import MoneyInput from './MoneyInput';
 
 const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState('');
@@ -74,10 +75,9 @@ const AddReminderModal = ({ isOpen, onClose, onSuccess }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('reminders_modal_amount_label')}</label>
             <div className="relative">
-              <input
-                type="number"
+              <MoneyInput
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onValueChange={setAmount}
                 placeholder="0"
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-green-500 outline-none pr-8 text-right"
               />
