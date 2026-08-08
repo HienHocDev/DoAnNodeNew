@@ -65,14 +65,7 @@ const Sidebar = () => {
         </nav>
       </div>
       
-      {/* Bottom decorative element */}
-      <div className="p-6 border-t border-gray-100 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-900/50">
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-4 text-white shadow-lg shadow-primary-500/20 relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-xl"></div>
-          <p className="text-xs font-medium opacity-90 mb-1">{t('sidebar_help_title')}</p>
-          <p className="text-sm font-bold">{t('sidebar_help_desc')}</p>
-        </div>
-      </div>
+
     </div>
   );
 };
