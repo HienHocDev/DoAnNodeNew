@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  getDashboardAnalytics, 
-  getBehaviorAnalytics, 
+  getDashboardAnalytics,
+  getLongTermAnalytics,
   getMonthlyReport 
 } = require('../controllers/analyticsController');
 const { protect } = require('../middleware/authMiddleware');
@@ -11,7 +11,7 @@ const { protect } = require('../middleware/authMiddleware');
 router.get('/dashboard', protect, getDashboardAnalytics);
 
 // 2. Route trang Phân tích hành vi
-router.get('/analysis', protect, getBehaviorAnalytics);
+router.get('/analysis', protect, getLongTermAnalytics);
 
 // 3. Route trang Báo cáo (Dữ liệu thực tế cho PDF / Excel)
 router.get('/reports/monthly', protect, getMonthlyReport);

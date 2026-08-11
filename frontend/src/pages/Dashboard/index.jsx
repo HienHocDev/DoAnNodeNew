@@ -15,9 +15,7 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4'
 const comparisonLabels = {
   none: 'Không so sánh',
   previousMonth: 'Tháng trước',
-  samePeriodLastYear: 'Cùng kỳ năm trước',
-  previousQuarter: 'Quý trước',
-  previousYear: 'Năm trước'
+  customMonth: 'Tháng tùy chọn'
 };
 
 const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -68,6 +66,12 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [comparisonType, setComparisonType] = useState('none');
+  const [comparisonMonth, setComparisonMonth] = useState(() => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - 1);
+    return date.toISOString().slice(0, 7);
+  });
   const { t } = useTheme();
 
   useEffect(() => {
@@ -76,7 +80,7 @@ const Dashboard = () => {
       try {
         setLoading(true);
         setError('');
-        const response = await getDashboardAnalytics(selectedMonth, comparisonType);
+        const response = await getDashboardAnalytics(selectedMonth, comparisonType, comparisonType === 'customMonth' ? comparisonMonth : undefined);
         if (active) setAnalyticsData(response);
       } catch (requestError) {
         if (active) setError(requestError.response?.data?.message || t('dashboard_error_api'));
@@ -86,7 +90,7 @@ const Dashboard = () => {
     };
     fetchAnalytics();
     return () => { active = false; };
-  }, [selectedMonth, comparisonType, t]);
+  }, [selectedMonth, comparisonType, comparisonMonth, t]);
 
   const pieData = useMemo(() => (analyticsData?.categoryData || []).map((item, index) => ({
     ...item,
@@ -139,6 +143,9 @@ const Dashboard = () => {
               {Object.entries(comparisonLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
+          {comparisonType === 'customMonth' && (
+            <input aria-label="Tháng so sánh" type="month" value={comparisonMonth} onChange={(event) => setComparisonMonth(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+          )}
         </div>
       </div>
 

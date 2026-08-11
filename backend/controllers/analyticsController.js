@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const Budget = require('../models/Budget');
 const mongoose = require('mongoose');
 
 const parseMonthRange = (date) => {
@@ -23,7 +24,7 @@ const totalsByType = (rows) => rows.reduce((result, item) => {
 
 const createPeriod = (startDate, endDate, unit, label) => ({ startDate, endDate, unit, label });
 
-const getComparisonPeriods = (range, comparisonType) => {
+const getComparisonPeriods = (range, comparisonType, customRange = null) => {
   const currentMonthStart = range.startDate;
   const nextMonthStart = range.endDate;
   if (comparisonType === 'none') {
@@ -37,6 +38,17 @@ const getComparisonPeriods = (range, comparisonType) => {
     return {
       current: createPeriod(currentMonthStart, nextMonthStart, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year}`),
       previous: createPeriod(previousStart, currentMonthStart, 'day', `Tháng ${String(previousStart.getUTCMonth() + 1).padStart(2, '0')}/${previousStart.getUTCFullYear()}`)
+    };
+  }
+  if (comparisonType === 'customMonth' && customRange) {
+    return {
+      current: createPeriod(currentMonthStart, nextMonthStart, 'day', `Tháng ${String(range.month).padStart(2, '0')}/${range.year}`),
+      previous: createPeriod(
+        customRange.startDate,
+        customRange.endDate,
+        'day',
+        `Tháng ${String(customRange.month).padStart(2, '0')}/${customRange.year}`
+      )
     };
   }
   if (comparisonType === 'samePeriodLastYear') {
@@ -138,13 +150,17 @@ const getDashboardAnalytics = async (req, res) => {
     const range = parseMonthRange(req.query.date);
     if (!range) return res.status(400).json({ message: 'Tháng phải có định dạng YYYY-MM' });
     const comparisonType = req.query.comparison || 'previousMonth';
-    const validComparisons = ['none', 'previousMonth', 'samePeriodLastYear', 'previousQuarter', 'previousYear'];
+    const validComparisons = ['none', 'previousMonth', 'customMonth', 'samePeriodLastYear', 'previousQuarter', 'previousYear'];
     if (!validComparisons.includes(comparisonType)) {
       return res.status(400).json({ message: 'Loại so sánh không hợp lệ' });
     }
 
+    const customRange = comparisonType === 'customMonth' ? parseMonthRange(req.query.comparisonDate) : null;
+    if (comparisonType === 'customMonth' && !customRange) {
+      return res.status(400).json({ message: 'Tháng so sánh phải có định dạng YYYY-MM' });
+    }
     const user = new mongoose.Types.ObjectId(req.user.id || req.user._id);
-    const periods = getComparisonPeriods(range, comparisonType);
+    const periods = getComparisonPeriods(range, comparisonType, customRange);
     const [currentAnalytics, previousAnalytics] = await Promise.all([
       getPeriodAnalytics(user, periods.current),
       getPeriodAnalytics(user, periods.previous)
@@ -282,6 +298,189 @@ const getBehaviorAnalytics = async (req, res) => {
   }
 };
 
+const createLongTermPeriod = (periodType, year, quarter) => {
+  if (periodType === 'quarter') {
+    const startMonth = (quarter - 1) * 3;
+    return createPeriod(
+      new Date(Date.UTC(year, startMonth, 1)),
+      new Date(Date.UTC(year, startMonth + 3, 1)),
+      'month',
+      `Quý ${quarter}/${year}`
+    );
+  }
+  return createPeriod(
+    new Date(Date.UTC(year, 0, 1)),
+    new Date(Date.UTC(year + 1, 0, 1)),
+    'month',
+    `Năm ${year}`
+  );
+};
+
+const getLongTermComparisonPeriod = (periodType, year, quarter, comparisonType) => {
+  if (comparisonType === 'none') return null;
+  if (periodType === 'year') return createLongTermPeriod('year', year - 1);
+  if (comparisonType === 'sameQuarterLastYear') return createLongTermPeriod('quarter', year - 1, quarter);
+  const previousQuarterDate = new Date(Date.UTC(year, (quarter - 1) * 3 - 3, 1));
+  return createLongTermPeriod(
+    'quarter',
+    previousQuarterDate.getUTCFullYear(),
+    Math.floor(previousQuarterDate.getUTCMonth() / 3) + 1
+  );
+};
+
+const monthKey = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const getLongTermPeriodData = async (user, period) => {
+  if (!period) return null;
+  const transactions = await Transaction.find(periodMatch(user, period))
+    .select('amount type category date')
+    .lean();
+  const totals = { income: 0, expense: 0, balance: 0, transactionCount: transactions.length };
+  const categories = new Map();
+  const monthly = new Map();
+
+  transactions.forEach((transaction) => {
+    const amount = Number(transaction.amount) || 0;
+    if (transaction.type === 'income') totals.income += amount;
+    if (transaction.type === 'expense') {
+      totals.expense += amount;
+      categories.set(transaction.category, (categories.get(transaction.category) || 0) + amount);
+    }
+    const key = monthKey(new Date(transaction.date));
+    const bucket = monthly.get(key) || { income: 0, expense: 0, transactionCount: 0 };
+    if (transaction.type === 'income') bucket.income += amount;
+    if (transaction.type === 'expense') bucket.expense += amount;
+    bucket.transactionCount += 1;
+    monthly.set(key, bucket);
+  });
+  totals.balance = totals.income - totals.expense;
+
+  const trendData = Array.from({ length: getPeriodBucketCount(period) }, (_, index) => {
+    const date = new Date(Date.UTC(period.startDate.getUTCFullYear(), period.startDate.getUTCMonth() + index, 1));
+    const key = monthKey(date);
+    return {
+      key,
+      name: `T${date.getUTCMonth() + 1}`,
+      ...(monthly.get(key) || { income: 0, expense: 0, transactionCount: 0 })
+    };
+  });
+  const categoryData = Array.from(categories, ([name, value]) => ({
+    name,
+    value,
+    percentage: totals.expense ? (value / totals.expense) * 100 : 0
+  })).sort((a, b) => b.value - a.value);
+  const expenseMonths = trendData.filter((item) => item.expense > 0);
+
+  return {
+    label: period.label,
+    totals,
+    trendData,
+    categoryData,
+    highlights: {
+      highestExpenseMonth: expenseMonths.length ? [...expenseMonths].sort((a, b) => b.expense - a.expense)[0] : null,
+      lowestExpenseMonth: expenseMonths.length ? [...expenseMonths].sort((a, b) => a.expense - b.expense)[0] : null,
+      topCategory: categoryData[0] || null
+    }
+  };
+};
+
+const buildLongTermComparison = (current, previous) => {
+  if (!previous) return null;
+  const currentCategories = new Map(current.categoryData.map((item) => [item.name, item.value]));
+  const previousCategories = new Map(previous.categoryData.map((item) => [item.name, item.value]));
+  const categoryNames = new Set([...currentCategories.keys(), ...previousCategories.keys()]);
+  const categories = Array.from(categoryNames, (name) => {
+    const currentValue = currentCategories.get(name) || 0;
+    const previousValue = previousCategories.get(name) || 0;
+    return {
+      name,
+      currentValue,
+      previousValue,
+      change: currentValue - previousValue,
+      changePercent: percentageChange(currentValue, previousValue)
+    };
+  }).sort((a, b) => b.currentValue - a.currentValue || b.previousValue - a.previousValue);
+
+  return {
+    incomeChange: current.totals.income - previous.totals.income,
+    incomeChangePercent: percentageChange(current.totals.income, previous.totals.income),
+    expenseChange: current.totals.expense - previous.totals.expense,
+    expenseChangePercent: percentageChange(current.totals.expense, previous.totals.expense),
+    balanceChange: current.totals.balance - previous.totals.balance,
+    balanceChangePercent: percentageChange(current.totals.balance, previous.totals.balance),
+    transactionCountChange: current.totals.transactionCount - previous.totals.transactionCount,
+    transactionCountChangePercent: percentageChange(current.totals.transactionCount, previous.totals.transactionCount),
+    categories
+  };
+};
+
+const getBudgetWarnings = async (user, period, currentData) => {
+  const months = currentData.trendData.map((item) => item.key);
+  const budgets = await Budget.find({ user, month: { $in: months } }).select('category amount month').lean();
+  if (!budgets.length) return [];
+  const expenses = await Transaction.aggregate([
+    { $match: { ...periodMatch(user, period), type: 'expense' } },
+    { $group: { _id: { category: '$category', month: { $dateToString: { format: '%Y-%m', date: '$date', timezone: 'UTC' } } }, spent: { $sum: '$amount' } } }
+  ]);
+  const expenseMap = new Map(expenses.map((item) => [`${item._id.month}:${item._id.category}`, item.spent]));
+  return budgets.map((budget) => {
+    const spent = expenseMap.get(`${budget.month}:${budget.category}`) || 0;
+    const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
+    return {
+      category: budget.category,
+      month: budget.month,
+      budget: budget.amount,
+      spent,
+      percentage,
+      exceededBy: Math.max(spent - budget.amount, 0)
+    };
+  }).filter((item) => item.exceededBy > 0 || item.percentage >= 80)
+    .sort((a, b) => b.percentage - a.percentage);
+};
+
+const getLongTermAnalytics = async (req, res) => {
+  try {
+    const periodType = req.query.period || 'quarter';
+    const year = Number(req.query.year || new Date().getUTCFullYear());
+    const quarter = Number(req.query.quarter || Math.floor(new Date().getUTCMonth() / 3) + 1);
+    const comparisonType = req.query.comparison || 'none';
+    const validComparisons = periodType === 'quarter'
+      ? ['none', 'previousQuarter', 'sameQuarterLastYear']
+      : ['none', 'previousYear'];
+
+    if (!['quarter', 'year'].includes(periodType)) return res.status(400).json({ message: 'Kỳ phân tích không hợp lệ' });
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return res.status(400).json({ message: 'Năm không hợp lệ' });
+    if (periodType === 'quarter' && (!Number.isInteger(quarter) || quarter < 1 || quarter > 4)) {
+      return res.status(400).json({ message: 'Quý không hợp lệ' });
+    }
+    if (!validComparisons.includes(comparisonType)) return res.status(400).json({ message: 'Loại so sánh không hợp lệ' });
+
+    const user = new mongoose.Types.ObjectId(req.user.id || req.user._id);
+    const currentPeriod = createLongTermPeriod(periodType, year, quarter);
+    const previousPeriod = getLongTermComparisonPeriod(periodType, year, quarter, comparisonType);
+    const [current, previous] = await Promise.all([
+      getLongTermPeriodData(user, currentPeriod),
+      getLongTermPeriodData(user, previousPeriod)
+    ]);
+    const budgetWarnings = await getBudgetWarnings(user, currentPeriod, current);
+
+    return res.json({
+      period: periodType,
+      year,
+      quarter: periodType === 'quarter' ? quarter : null,
+      comparisonType,
+      hasData: current.totals.transactionCount > 0,
+      current,
+      previous,
+      comparison: buildLongTermComparison(current, previous),
+      budgetWarnings
+    });
+  } catch (err) {
+    console.error('Long-term analysis error:', err);
+    return res.status(500).json({ message: 'Lỗi hệ thống khi phân tích tài chính dài hạn' });
+  }
+};
+
 const getMonthlyReport = async (req, res) => {
   try {
     const range = parseMonthRange(req.query.date);
@@ -311,4 +510,4 @@ const getMonthlyReport = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardAnalytics, getBehaviorAnalytics, getMonthlyReport };
+module.exports = { getDashboardAnalytics, getLongTermAnalytics, getMonthlyReport };
