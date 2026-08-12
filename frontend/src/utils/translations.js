@@ -14,7 +14,7 @@ export const translations = {
     header_month: 'Tháng',
     header_logout: 'Đăng xuất',
     settings_title: 'Cài đặt',
-    settings_profile: 'Hồ sơ cá nhân',
+    settings_profile: 'Hồ sơ',
     settings_password: 'Đổi mật khẩu',
     settings_notifications: 'Thông báo',
     settings_backup: 'Sao lưu dữ liệu',

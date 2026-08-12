@@ -93,6 +93,7 @@ const Goals = () => {
 
   const [goalToUpdate, setGoalToUpdate] = useState(null);
   const [amountToAdd, setAmountToAdd] = useState('');
+  const [updateNote, setUpdateNote] = useState('');
   const [updateError, setUpdateError] = useState('');
   const [updating, setUpdating] = useState(false);
 
@@ -157,9 +158,10 @@ const Goals = () => {
     try {
       setUpdating(true);
       setUpdateError('');
-      await updateGoalAmount(goalToUpdate._id, amount);
+      await updateGoalAmount(goalToUpdate._id, amount, updateNote);
       setGoalToUpdate(null);
       setAmountToAdd('');
+      setUpdateNote('');
       await fetchGoalsData();
     } catch (updateRequestError) {
       setUpdateError(updateRequestError.response?.data?.message || t('goals_error_update'));
@@ -247,7 +249,12 @@ const Goals = () => {
               <GoalAnalysisCard
                 key={goal._id}
                 goal={goal}
-                onUpdate={() => { setGoalToUpdate(goal); setAmountToAdd(''); setUpdateError(''); }}
+                onUpdate={() => {
+                  setGoalToUpdate(goal);
+                  setAmountToAdd('');
+                  setUpdateNote('');
+                  setUpdateError('');
+                }}
                 onEdit={() => openEditModal(goal)}
                 onDelete={() => { setGoalToDelete(goal); setDeleteError(''); }}
               />
@@ -280,8 +287,30 @@ const Goals = () => {
           </div>
           <form onSubmit={handleUpdateProgress} className="space-y-4">
             <Field label="Số tiền muốn thêm" type="number" min="0.01" step="any" autoFocus value={amountToAdd} onChange={(e) => { setAmountToAdd(e.target.value); setUpdateError(''); }} disabled={updating} />
+            <label className="block">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Ghi chú (không bắt buộc)</span>
+              <textarea
+                rows="3"
+                maxLength="120"
+                value={updateNote}
+                onChange={(event) => setUpdateNote(event.target.value)}
+                disabled={updating}
+                placeholder="Ví dụ: Tiết kiệm từ lương tháng này"
+                className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm font-medium outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-gray-100"
+              />
+              <span className="mt-1 block text-right text-[11px] text-gray-400">{updateNote.length}/120</span>
+            </label>
             {updateError && <p className="text-sm font-medium text-rose-600">{updateError}</p>}
-            <ModalActions busy={updating} onCancel={() => setGoalToUpdate(null)} submitLabel="Cập nhật" />
+            <ModalActions
+              busy={updating}
+              onCancel={() => {
+                setGoalToUpdate(null);
+                setAmountToAdd('');
+                setUpdateNote('');
+                setUpdateError('');
+              }}
+              submitLabel="Cập nhật"
+            />
           </form>
         </Modal>
       )}
